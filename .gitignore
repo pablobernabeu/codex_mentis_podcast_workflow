@@ -13,8 +13,7 @@ output/
 # Episode data (may contain personal information)
 episode_titles.json
 
-# Input audio files (typically large and personal)
-input/
+# Typically large audio files 
 *.wav
 *.mp3
 *.flac
