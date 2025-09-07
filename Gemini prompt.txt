@@ -1,5 +1,4 @@
 
-
 write a script for an hour-long science podcast that addresses . depart from and expand the horizon to provide a representative picture of the methods used for the design of experiments (including behavioural and neurological approaches, instruments, paradigms), the statistical analysis (methods, variables), the analysis of statistical power (types and tools), etc.
 
 the podcast is led by a female researcher who is supported by a male researcher. 
