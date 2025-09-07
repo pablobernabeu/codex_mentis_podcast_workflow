@@ -2,7 +2,11 @@
 
 A Python tool to convert WAV audio files into visually appealing MP4 videos with animated waveforms, logo animations and professional audio processing. This workflow was vibe-coded by Pablo Bernabeu for the Codex Mentis podcast, available on [Youtube](https://www.youtube.com/playlist?list=PLJ8d7PauMiCs6TkzJfv5cT88oAJhzoy0N), [Spotify](https://open.spotify.com/show/4QXENVjprdaGkTvOexGvD3), [Apple Podcasts](https://podcasts.apple.com/au/podcast/codex-mentis-science-and-tech-to-study-cognition/id1836910507) and [iVoox](https://www.ivoox.com/en/podcast-codex-mentis-science-and-tech-to-study-cognition_sq_f12741704_1.html).
 
-## Features
+## Initial Workflow
+
+The current repository focusses on the video creation workflow. However, before that, the podcast is created using artificial intelligence tools. A good option is to begin by creating a script using Google Gemini Pro by providing the key materials. An example of the prompt is available in [Gemini prompt.txt](https://github.com/pablobernabeu/codex_mentis_podcast_workflow/blob/main/Gemini%20prompt.txt). Next, the audio is created using NotebookLM using a prompt like [NotebookLM prompt.txt](https://github.com/pablobernabeu/codex_mentis_podcast_workflow/blob/main/NotebookLM%20prompt.txt).
+
+## Video Creation Workflow
 
 - **Audio Enhancement**: Automatic volume stabilisation optimised for AI-generated speech
 - **Professional Intro/Outro**: Royalty-free musical intro and outro added to each episode
