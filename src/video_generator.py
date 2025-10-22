@@ -346,23 +346,35 @@ class VideoGenerator:
             
             video_clip = VideoClip(make_frame, duration=duration)
             
-            # Combine video and audio
-            final_clip = video_clip.set_audio(audio_clip)
+            # Combine video and audio (compatible with moviepy 1.x and 2.x)
+            if hasattr(video_clip, 'set_audio'):
+                # moviepy 1.x
+                final_clip = video_clip.set_audio(audio_clip)
+            else:
+                # moviepy 2.x
+                video_clip.audio = audio_clip
+                final_clip = video_clip
             
             # Write final video with optimized settings
             print(f"💾 Saving video to: {output_path}")
-            final_clip.write_videofile(
-                output_path,
-                fps=self.fps,
-                codec='libx264',
-                audio_codec='aac',
-                temp_audiofile='temp-audio.m4a',
-                remove_temp=True,
-                verbose=False,
-                logger=None,
-                preset='medium',  # Balance between speed and file size
-                ffmpeg_params=['-crf', '23']  # Good quality with reasonable file size
-            )
+            
+            # Build write_videofile parameters (compatible with moviepy 1.x and 2.x)
+            write_params = {
+                'fps': self.fps,
+                'codec': 'libx264',
+                'audio_codec': 'aac',
+                'temp_audiofile': 'temp-audio.m4a',
+                'remove_temp': True,
+                'preset': 'medium',  # Balance between speed and file size
+                'ffmpeg_params': ['-crf', '23']  # Good quality with reasonable file size
+            }
+            
+            # Add verbose and logger only for moviepy 1.x
+            if hasattr(video_clip, 'set_audio'):
+                write_params['verbose'] = False
+                write_params['logger'] = None
+            
+            final_clip.write_videofile(output_path, **write_params)
             
             # Clean up
             final_clip.close()
