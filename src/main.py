@@ -23,6 +23,9 @@ from video_generator import VideoGenerator
 class PodcastVideoConverter:
     """Main application class for the podcast video converter."""
     
+    # Supported audio formats
+    SUPPORTED_AUDIO_FORMATS = {'.wav', '.mp3', '.flac', '.m4a', '.aac', '.ogg', '.wma'}
+    
     def __init__(self):
         self.base_dir = Path(__file__).parent.parent
         self.input_dir = self.base_dir / "input"
@@ -65,14 +68,14 @@ class PodcastVideoConverter:
         except Exception as e:
             print(f"Warning: Could not save episode titles: {e}")
     
-    def get_wav_files(self):
-        """Get list of WAV files in the input directory."""
+    def get_audio_files(self):
+        """Get list of supported audio files in the input directory."""
         # Use case-insensitive search to avoid duplicates
-        wav_files = []
+        audio_files = []
         for file_path in self.input_dir.iterdir():
-            if file_path.is_file() and file_path.suffix.lower() == '.wav':
-                wav_files.append(file_path)
-        return sorted(wav_files)
+            if file_path.is_file() and file_path.suffix.lower() in self.SUPPORTED_AUDIO_FORMATS:
+                audio_files.append(file_path)
+        return sorted(audio_files)
     
     def collect_all_episode_titles(self, selected_files):
         """Collect episode titles for all selected files upfront."""
@@ -118,19 +121,19 @@ class PodcastVideoConverter:
         print("✅ All episode titles collected and saved!")
         return True
     
-    def select_files_to_process(self, wav_files):
-        """Let user select which files to process."""
-        if not wav_files:
-            print("❌ No WAV files found in the input directory!")
-            print(f"Please place your WAV files in: {self.input_dir}")
+    def select_files_to_process(self, audio_files):
+        """Interactive file selection from available audio files."""
+        if not audio_files:
+            print("❌ No audio files found in the input directory!")
+            print(f"Please place your audio files (.wav, .mp3, .flac, etc.) in: {self.input_dir}")
             return []
         
-        print(f"\n📁 Found {len(wav_files)} WAV file(s) in input directory:")
+        print(f"\n📁 Found {len(audio_files)} audio file(s) in input directory:")
         print("-" * 60)
         
-        for i, wav_file in enumerate(wav_files, 1):
-            size_mb = wav_file.stat().st_size / (1024 * 1024)
-            print(f"{i:2d}. {wav_file.name} ({size_mb:.1f} MB)")
+        for i, audio_file in enumerate(audio_files, 1):
+            size_mb = audio_file.stat().st_size / (1024 * 1024)
+            print(f"{i:2d}. {audio_file.name} ({size_mb:.1f} MB)")
         
         print("\n🎯 Selection options:")
         print("  • Enter numbers (e.g., 1,3,5): Process specific files")
@@ -147,12 +150,12 @@ class PodcastVideoConverter:
                     return []
                 elif selection == 'all':
                     print("✓ Selected all files")
-                    return wav_files
+                    return audio_files
                 else:
                     try:
                         # Parse comma-separated numbers
                         indices = [int(x.strip()) - 1 for x in selection.split(',')]
-                        selected_files = [wav_files[i] for i in indices if 0 <= i < len(wav_files)]
+                        selected_files = [audio_files[i] for i in indices if 0 <= i < len(audio_files)]
                         
                         if selected_files:
                             print(f"✓ Selected {len(selected_files)} file(s)")
@@ -282,7 +285,7 @@ class PodcastVideoConverter:
         """Main application entry point."""
         print("🎙️  Codex Mentis Podcast Video Converter")
         print("=" * 60)
-        print("Converting WAV files to MP4 videos with elegant waveform visualization")
+        print("Converting audio files to MP4 videos with elegant waveform visualisation")
         print()
         
         # Check setup
@@ -290,13 +293,13 @@ class PodcastVideoConverter:
         self.check_logo_file()
         
         # Get available files
-        print("📂 Scanning for WAV files...")
-        wav_files = self.get_wav_files()
-        print(f"✓ Found {len(wav_files)} WAV files")
+        print("📂 Scanning for audio files...")
+        audio_files = self.get_audio_files()
+        print(f"✓ Found {len(audio_files)} audio files")
         
         # Let user select files
         print("📝 File selection...")
-        selected_files = self.select_files_to_process(wav_files)
+        selected_files = self.select_files_to_process(audio_files)
         
         if not selected_files:
             print("\n👋 No files selected. Goodbye!")

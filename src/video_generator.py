@@ -1,6 +1,11 @@
 import os
 import numpy as np
-from moviepy.editor import VideoClip, AudioFileClip, CompositeVideoClip
+try:
+    # Try moviepy 2.x imports
+    from moviepy import VideoClip, AudioFileClip, CompositeVideoClip
+except ImportError:
+    # Fall back to moviepy 1.x imports
+    from moviepy.editor import VideoClip, AudioFileClip, CompositeVideoClip
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import cv2
 from waveform_visualizer import WaveformVisualizer

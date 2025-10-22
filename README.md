@@ -1,6 +1,6 @@
 # Audio to Video Converter for Codex Mentis Podcast
 
-A Python tool to convert WAV audio files into visually appealing MP4 videos with animated waveforms, logo animations and professional audio processing. This workflow was vibe-coded by Pablo Bernabeu for the Codex Mentis podcast, available on [Youtube](https://www.youtube.com/playlist?list=PLJ8d7PauMiCs6TkzJfv5cT88oAJhzoy0N), [Spotify](https://open.spotify.com/show/4QXENVjprdaGkTvOexGvD3), [Apple Podcasts](https://podcasts.apple.com/au/podcast/codex-mentis-science-and-tech-to-study-cognition/id1836910507) and [iVoox](https://www.ivoox.com/en/podcast-codex-mentis-science-and-tech-to-study-cognition_sq_f12741704_1.html).
+A Python tool to convert audio files (WAV, MP3, FLAC, M4A, AAC, OGG, WMA) into visually appealing MP4 videos with animated waveforms, logo animations and professional audio processing. This workflow was vibe-coded by Pablo Bernabeu for the Codex Mentis podcast, available on [Youtube](https://www.youtube.com/playlist?list=PLJ8d7PauMiCs6TkzJfv5cT88oAJhzoy0N), [Spotify](https://open.spotify.com/show/4QXENVjprdaGkTvOexGvD3), [Apple Podcasts](https://podcasts.apple.com/au/podcast/codex-mentis-science-and-tech-to-study-cognition/id1836910507) and [iVoox](https://www.ivoox.com/en/podcast-codex-mentis-science-and-tech-to-study-cognition_sq_f12741704_1.html).
 
 ## Initial Workflow
 
@@ -23,6 +23,57 @@ The current repository focusses on the video creation workflow. However, before 
 
 ### 1. Install Dependencies
 
+First, ensure you have **FFmpeg** installed on your system (required for audio format conversion):
+
+**Windows (easiest method using winget):**
+
+```bash
+winget install Gyan.FFmpeg
+```
+
+After installation, **restart your terminal** for FFmpeg to be available.
+
+**Alternative Windows methods:**
+
+```bash
+# Using chocolatey
+choco install ffmpeg
+
+# Or download manually from https://www.gyan.dev/ffmpeg/builds/
+# Extract to C:\ffmpeg and add C:\ffmpeg\bin to your PATH
+```
+
+**macOS:**
+
+```bash
+brew install ffmpeg
+```
+
+**Linux:**
+
+```bash
+sudo apt-get install ffmpeg  # Ubuntu/Debian
+sudo yum install ffmpeg      # CentOS/RHEL
+```
+
+Then, create and activate a virtual environment (recommended):
+
+```bash
+# Create virtual environment
+python -m venv .venv
+
+# Activate it (Windows Git Bash)
+source .venv/Scripts/activate
+
+# Or on Windows Command Prompt
+.venv\Scripts\activate
+
+# Or on Windows PowerShell
+.venv\Scripts\Activate.ps1
+```
+
+Then install the required packages:
+
 ```bash
 pip install -r requirements.txt
 ```
@@ -35,7 +86,7 @@ Place your files in the following structure:
 podcast/
 ├── assets/
 │   └── podcast_logo.*             # Place your podcast logo here (any image format, REQUIRED)
-├── input/                        # Place your WAV files here
+├── input/                        # Place your audio files here (WAV, MP3, FLAC, M4A, AAC, OGG, WMA)
 ├── output/                       # Generated MP4 files will be saved here
 ├── .waveform_cache/              # Auto-generated cache directories (created automatically)
 ├── src/
@@ -64,18 +115,36 @@ The tool will automatically validate your logo setup and exit with an error if n
 Run the main script:
 
 ```bash
+# Using the helper script (recommended - handles FFmpeg PATH automatically)
+./run.sh
+
+# Or manually:
 python src/main.py
 ```
 
+**Note:** If FFmpeg isn't found, you may need to restart your terminal or use the `run.sh` script which automatically adds FFmpeg to your PATH.
+
 The tool will:
 
-1. Show available WAV files in the `input/` directory
+1. Show available audio files in the `input/` directory (supports WAV, MP3, FLAC, M4A, AAC, OGG, WMA)
 2. Let you select which file(s) to process
 3. Process each file with audio enhancement
 4. Generate MP4 with animated waveform and logo
 5. Save results in the `output/` directory
 
-### 5. Episode Title Configuration
+### 5. Audio Format Support
+
+The tool supports multiple audio formats:
+- **WAV** - Uncompressed audio (recommended for best quality)
+- **MP3** - Compressed audio
+- **FLAC** - Lossless compressed audio
+- **M4A/AAC** - Advanced Audio Coding
+- **OGG** - Ogg Vorbis
+- **WMA** - Windows Media Audio
+
+All formats are automatically converted and processed with the same quality output.
+
+### 6. Episode Title Configuration
 
 For each WAV file, you can specify a custom episode title. The tool will prompt you for this during processing or you can modify the `episode_titles.json` file.
 
