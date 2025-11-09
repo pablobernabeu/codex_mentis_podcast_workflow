@@ -200,6 +200,22 @@ class PodcastVideoConverter:
             print(f"✓ Logo found: {self.logo_path.name}")
             return True
     
+    def get_episode_image_path(self, audio_file_path):
+        """Check for an optional episode-specific image matching the audio filename."""
+        # Supported image formats
+        image_extensions = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp']
+        
+        # Look in the same directory as the audio file
+        base_name = audio_file_path.stem
+        audio_dir = audio_file_path.parent
+        
+        for ext in image_extensions:
+            potential_image = audio_dir / f"{base_name}{ext}"
+            if potential_image.exists():
+                return potential_image
+        
+        return None
+    
     def get_episode_title(self, wav_file_path):
         """Get episode title for a file (should already be collected)."""
         filename = wav_file_path.stem
@@ -255,12 +271,18 @@ class PodcastVideoConverter:
             # Logo is guaranteed to exist due to startup validation
             logo_path = self.logo_path
             
+            # Check for optional episode-specific image
+            episode_image_path = self.get_episode_image_path(wav_file_path)
+            if episode_image_path:
+                print(f"📸 Episode image found: {episode_image_path.name}")
+            
             success = self.video_generator.create_video(
                 str(enhanced_audio_path),  # Use the saved enhanced audio
                 waveform_frame_generator,
                 episode_title,
                 str(output_path),
-                str(logo_path) if logo_path else None
+                str(logo_path) if logo_path else None,
+                str(episode_image_path) if episode_image_path else None
             )
             
             # No need to clean up temporary file since we saved the enhanced audio permanently

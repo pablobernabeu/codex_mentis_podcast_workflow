@@ -74,6 +74,49 @@ class VideoGenerator:
             print(f"✗ Error loading logo: {e}")
             return None
     
+    def load_and_prepare_episode_image(self, episode_image_path):
+        """Load and prepare an optional episode-specific image."""
+        try:
+            if not episode_image_path or not os.path.exists(episode_image_path):
+                return None
+            
+            # Load image
+            img = Image.open(episode_image_path)
+            
+            # Convert to RGBA if not already
+            if img.mode != 'RGBA':
+                img = img.convert('RGBA')
+            
+            # Calculate target height (40% of video height)
+            target_height = int(self.height * 0.4)
+            
+            # Calculate width maintaining aspect ratio
+            aspect_ratio = img.width / img.height
+            target_width = int(target_height * aspect_ratio)
+            
+            # Resize image
+            img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+            
+            # Add subtle shadow/border for better visibility
+            shadow = Image.new('RGBA', (img.width + 20, img.height + 20), (0, 0, 0, 0))
+            shadow_draw = ImageDraw.Draw(shadow)
+            shadow_draw.rectangle(
+                [(10, 10), (img.width + 10, img.height + 10)],
+                fill=(0, 0, 0, 100)
+            )
+            shadow = shadow.filter(ImageFilter.GaussianBlur(radius=8))
+            
+            # Create final image with shadow
+            final_img = Image.new('RGBA', shadow.size, (0, 0, 0, 0))
+            final_img.paste(shadow, (0, 0), shadow)
+            final_img.paste(img, (10, 10), img)
+            
+            print(f"✓ Episode image loaded and prepared: {img.size}")
+            return final_img
+        except Exception as e:
+            print(f"✗ Error loading episode image: {e}")
+            return None
+    
     def create_text_overlay(self, episode_title):
         """Create elegant text overlay with episode title at top and podcast name at bottom, with smaller side margins."""
         # Margins - smaller side margins for larger episode title
@@ -189,8 +232,8 @@ class VideoGenerator:
         scale_factor = base_scale + amplitude * np.sin(animation_progress)
         return scale_factor
     
-    def composite_frame(self, waveform_frame, logo, text_overlay, time_position, duration):
-        """Composite all elements into final frame with waveform over logo."""
+    def composite_frame(self, waveform_frame, logo, text_overlay, time_position, duration, episode_image=None):
+        """Composite all elements into final frame with waveform over logo and optional episode image."""
         # Start with the background color
         frame = Image.new('RGB', (self.width, self.height), (20, 25, 35))  # Background color
         frame = frame.convert('RGBA')
@@ -224,6 +267,15 @@ class VideoGenerator:
         # Apply the waveform over the frame with logo
         frame = Image.alpha_composite(frame, waveform_overlay)
         
+        # Add episode-specific image on top of waveform (if provided)
+        if episode_image is not None:
+            # Position on right half, vertically centered
+            episode_x = self.width - episode_image.width - 100  # 100px from right edge
+            episode_y = (self.height - episode_image.height) // 2  # Vertically centered
+            
+            # Composite episode image on top of waveform
+            frame.paste(episode_image, (episode_x, episode_y), episode_image)
+        
         # Add text overlay (positioned at top as specified)
         frame.paste(text_overlay, (0, 0), text_overlay)
         
@@ -255,7 +307,7 @@ class VideoGenerator:
         print("✓ Video fade effects applied!")
         return frames
     
-    def create_video(self, audio_path, waveform_frame_generator, episode_title, output_path, logo_path=None):
+    def create_video(self, audio_path, waveform_frame_generator, episode_title, output_path, logo_path=None, episode_image_path=None):
         """Create the final MP4 video using frame generator for memory efficiency."""
         print(f"\n🎬 Creating video: {os.path.basename(output_path)}")
         print("-" * 50)
@@ -265,6 +317,11 @@ class VideoGenerator:
             logo = None
             if logo_path and os.path.exists(logo_path):
                 logo = self.load_and_prepare_logo(logo_path)
+            
+            # Load and prepare episode-specific image (optional)
+            episode_image = None
+            if episode_image_path:
+                episode_image = self.load_and_prepare_episode_image(episode_image_path)
             
             # Create text overlay
             text_overlay = self.create_text_overlay(episode_title)
@@ -293,7 +350,7 @@ class VideoGenerator:
                     
                     # Composite this frame
                     final_frame = self.composite_frame(
-                        waveform_frame, logo, text_overlay, time_position, duration
+                        waveform_frame, logo, text_overlay, time_position, duration, episode_image
                     )
                     
                     # Apply fade if needed

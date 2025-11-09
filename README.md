@@ -12,6 +12,7 @@ The current repository focusses on the video creation workflow. However, before 
 - **Professional Intro/Outro**: Royalty-free musical intro and outro added to each episode
 - **Audio Waveform**: Continuous waveform visualisation representing real audio amplitude
 - **Logo Animation**: Subtle breathing animation effect for the podcast logo
+- **Episode Images**: Optional episode-specific images displayed on the right side
 - **Professional Typography**: Elegant serif fonts with proper text hierarchy
 - **Smooth Effects**: Professional transitions and animations
 - **YouTube Ready**: 1920x1080 HD resolution output
@@ -146,7 +147,25 @@ All formats are automatically converted and processed with the same quality outp
 
 ### 6. Episode Title Configuration
 
-For each WAV file, you can specify a custom episode title. The tool will prompt you for this during processing or you can modify the `episode_titles.json` file.
+For each audio file, you can specify a custom episode title. The tool will prompt you for this during processing or you can modify the `episode_titles.json` file.
+
+### 7. Optional Episode-Specific Images
+
+You can add an optional image for each episode that will appear on the right side of the video:
+
+- **Naming**: Image must match the audio filename (e.g., `episode_name.png` for `episode_name.wav`)
+- **Location**: Place in the same `input/` directory as the audio file
+- **Formats**: PNG, JPG, JPEG, WEBP, GIF, BMP
+- **Display**: Automatically positioned on right half, vertically centred, ~40% of video height
+- **Layering**: Appears on top of the waveform, below text overlays
+
+Example:
+```
+input/
+├── My Episode.wav
+├── My Episode.png          # Optional episode image
+└── Another Episode.m4a
+```
 
 ## Cache Management
 

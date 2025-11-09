@@ -18,8 +18,106 @@ class AudioProcessor:
         self.intro_duration = 18.0  # seconds (3 + 15)
         self.outro_duration = 17.5  # seconds (2.5 + 15)
     
+    def _find_ffmpeg(self):
+        """Find FFmpeg executable in common installation locations."""
+        import shutil
+        
+        # First, check if ffmpeg is in PATH
+        ffmpeg_path = shutil.which('ffmpeg')
+        if ffmpeg_path:
+            return ffmpeg_path
+        
+        # On Windows, check common installation locations
+        if os.name == 'nt':
+            potential_paths = [
+                # WinGet installation path
+                os.path.join(os.environ.get('LOCALAPPDATA', ''), 
+                            'Microsoft', 'WinGet', 'Packages', 
+                            'Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe',
+                            'ffmpeg-8.0-full_build', 'bin', 'ffmpeg.exe'),
+                # Chocolatey installation path
+                r'C:\ProgramData\chocolatey\bin\ffmpeg.exe',
+                # Manual installation paths
+                r'C:\ffmpeg\bin\ffmpeg.exe',
+                r'C:\Program Files\ffmpeg\bin\ffmpeg.exe',
+            ]
+            
+            for path in potential_paths:
+                if os.path.isfile(path):
+                    return path
+        
+        return None
+    
     def load_audio(self, file_path):
         """Load audio file and return audio data and sample rate."""
+        import subprocess
+        import tempfile
+        
+        # Check if file is a compressed format that might need FFmpeg
+        compressed_formats = ['.m4a', '.aac', '.mp3', '.ogg', '.wma']
+        file_ext = os.path.splitext(file_path)[1].lower()
+        
+        if file_ext in compressed_formats:
+            print(f"ℹ Detected compressed format {file_ext}, using FFmpeg conversion...")
+            
+            # Find FFmpeg executable
+            ffmpeg_exe = self._find_ffmpeg()
+            if not ffmpeg_exe:
+                print("✗ FFmpeg not found. Please ensure FFmpeg is installed.")
+                print("  Windows: winget install Gyan.FFmpeg")
+                print("  macOS: brew install ffmpeg")
+                print("  Linux: sudo apt-get install ffmpeg")
+                print("  After installation, restart your terminal.")
+                return None, None
+            
+            try:
+                # Convert to WAV using FFmpeg directly
+                with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav:
+                    temp_path = temp_wav.name
+                
+                # Use FFmpeg to convert to WAV
+                ffmpeg_cmd = [
+                    ffmpeg_exe,
+                    '-i', file_path,
+                    '-acodec', 'pcm_s16le',
+                    '-ar', str(self.sample_rate),
+                    '-ac', '1',
+                    '-y',
+                    temp_path
+                ]
+                
+                result = subprocess.run(
+                    ffmpeg_cmd,
+                    capture_output=True,
+                    text=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+                )
+                
+                if result.returncode != 0:
+                    print(f"✗ FFmpeg conversion failed:")
+                    print(f"  {result.stderr}")
+                    return None, None
+                
+                # Load the converted WAV file
+                audio, sr = librosa.load(temp_path, sr=self.sample_rate)
+                
+                # Clean up temp file
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
+                
+                print(f"✓ Loaded audio: {os.path.basename(file_path)}")
+                print(f"  Duration: {len(audio) / sr:.2f} seconds")
+                print(f"  Sample rate: {sr} Hz")
+                return audio, sr
+                
+            except Exception as e:
+                print(f"✗ Error during FFmpeg conversion:")
+                print(f"  {type(e).__name__}: {str(e)}")
+                return None, None
+        
+        # For WAV and FLAC files, use librosa directly
         try:
             audio, sr = librosa.load(file_path, sr=self.sample_rate)
             print(f"✓ Loaded audio: {os.path.basename(file_path)}")
@@ -27,7 +125,12 @@ class AudioProcessor:
             print(f"  Sample rate: {sr} Hz")
             return audio, sr
         except Exception as e:
-            print(f"✗ Error loading audio file: {e}")
+            print(f"✗ Error loading audio file:")
+            print(f"  File: {file_path}")
+            print(f"  Error type: {type(e).__name__}")
+            print(f"  Error message: {str(e)}")
+            import traceback
+            print(f"  Traceback: {traceback.format_exc()}")
             return None, None
     
     def normalize_volume(self, audio):
