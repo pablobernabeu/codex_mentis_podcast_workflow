@@ -75,7 +75,8 @@ class VideoGenerator:
             return None
     
     def load_and_prepare_episode_image(self, episode_image_path):
-        """Load and prepare an optional episode-specific image."""
+        """Load and prepare an optional episode-specific image with dark orange gradient frame.
+        Dynamically sizes to fit available space while respecting margins."""
         try:
             if not episode_image_path or not os.path.exists(episode_image_path):
                 return None
@@ -87,31 +88,93 @@ class VideoGenerator:
             if img.mode != 'RGBA':
                 img = img.convert('RGBA')
             
-            # Calculate target height (40% of video height)
-            target_height = int(self.height * 0.4)
+            # Calculate available space with healthy margins
+            # Top margin: account for episode title (approx 20% of height for title + extra spacing)
+            top_margin = int(self.height * 0.20)
+            # Bottom margin: account for podcast name (approx 15% of height for name + extra spacing)
+            bottom_margin = int(self.height * 0.15)
+            # Left margin: account for logo (approx 500px max logo + margins)
+            left_margin = 550
+            # Right margin: healthy spacing from edge
+            right_margin = 100
+            # Additional vertical margins for spacing
+            vertical_spacing = 100
             
-            # Calculate width maintaining aspect ratio
+            # Calculate maximum available dimensions
+            max_height = self.height - top_margin - bottom_margin - vertical_spacing
+            max_width = self.width - left_margin - right_margin
+            
+            # Get original aspect ratio
             aspect_ratio = img.width / img.height
+            
+            # Calculate target dimensions to fit within available space
+            # Try fitting by height first
+            target_height = max_height
             target_width = int(target_height * aspect_ratio)
             
-            # Resize image
+            # If too wide, fit by width instead
+            if target_width > max_width:
+                target_width = max_width
+                target_height = int(target_width / aspect_ratio)
+            
+            # Resize image maintaining aspect ratio
             img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
             
-            # Add subtle shadow/border for better visibility
-            shadow = Image.new('RGBA', (img.width + 20, img.height + 20), (0, 0, 0, 0))
-            shadow_draw = ImageDraw.Draw(shadow)
-            shadow_draw.rectangle(
-                [(10, 10), (img.width + 10, img.height + 10)],
-                fill=(0, 0, 0, 100)
+            # Create dark orange gradient frame
+            frame_width = 12  # Frame thickness
+            frame_size = (target_width + frame_width * 2, target_height + frame_width * 2)
+            
+            # Create gradient frame with multiple dark orange tones
+            frame = Image.new('RGBA', frame_size, (0, 0, 0, 0))
+            frame_draw = ImageDraw.Draw(frame)
+            
+            # Dark orange gradient colors (from darker to lighter orange)
+            orange_colors = [
+                (139, 69, 19),   # Saddle brown (darkest)
+                (160, 82, 45),   # Sienna
+                (184, 92, 46),   # Dark orange
+                (205, 102, 51),  # Chocolate
+                (218, 112, 56)   # Light chocolate (lightest)
+            ]
+            
+            # Draw gradient as concentric filled rectangles (from outside to inside)
+            num_layers = len(orange_colors)
+            layer_thickness = frame_width / num_layers
+            
+            for i, color in enumerate(orange_colors):
+                # Calculate the inset for this layer
+                inset = int(i * layer_thickness)
+                # Draw filled rectangle for this layer
+                frame_draw.rectangle(
+                    [inset, inset, frame_size[0] - inset - 1, frame_size[1] - inset - 1],
+                    fill=color
+                )
+            
+            # Add outer glow effect
+            glow = Image.new('RGBA', (frame_size[0] + 40, frame_size[1] + 40), (0, 0, 0, 0))
+            glow_draw = ImageDraw.Draw(glow)
+            glow_draw.rectangle(
+                [10, 10, frame_size[0] + 30, frame_size[1] + 30],
+                fill=(139, 69, 19, 60)  # Semi-transparent dark orange glow
             )
-            shadow = shadow.filter(ImageFilter.GaussianBlur(radius=8))
+            glow = glow.filter(ImageFilter.GaussianBlur(radius=15))
             
-            # Create final image with shadow
-            final_img = Image.new('RGBA', shadow.size, (0, 0, 0, 0))
-            final_img.paste(shadow, (0, 0), shadow)
-            final_img.paste(img, (10, 10), img)
+            # Composite everything together
+            final_size = (frame_size[0] + 40, frame_size[1] + 40)
+            final_img = Image.new('RGBA', final_size, (0, 0, 0, 0))
             
-            print(f"✓ Episode image loaded and prepared: {img.size}")
+            # Add glow
+            final_img.paste(glow, (0, 0), glow)
+            
+            # Add frame
+            final_img.paste(frame, (20, 20), frame)
+            
+            # Add image in center
+            img_offset = 20 + frame_width
+            final_img.paste(img, (img_offset, img_offset), img)
+            
+            print(f"✓ Episode image loaded and prepared: {img.size} with dark orange gradient frame")
+            print(f"  Available space: {max_width}x{max_height}, Final size: {final_size}")
             return final_img
         except Exception as e:
             print(f"✗ Error loading episode image: {e}")
@@ -121,7 +184,7 @@ class VideoGenerator:
         """Create elegant text overlay with episode title at top and podcast name at bottom, with smaller side margins."""
         # Margins - smaller side margins for larger episode title
         margin_x = int(self.width * 0.05)  # Reduced from 10% to 5%
-        margin_y = int(self.height * 0.10)
+        margin_y = int(self.height * 0.06)  # Reduced from 10% to 6% to move title up
         usable_width = self.width - 2 * margin_x
         usable_height = self.height - 2 * margin_y
         
@@ -269,8 +332,11 @@ class VideoGenerator:
         
         # Add episode-specific image on top of waveform (if provided)
         if episode_image is not None:
-            # Position on right half, vertically centered
-            episode_x = self.width - episode_image.width - 100  # 100px from right edge
+            # Position at center with slight rightward shift
+            # Center would be: (self.width - episode_image.width) // 2
+            # Add 10% of width as rightward shift
+            rightward_shift = int(self.width * 0.10)
+            episode_x = (self.width - episode_image.width) // 2 + rightward_shift
             episode_y = (self.height - episode_image.height) // 2  # Vertically centered
             
             # Composite episode image on top of waveform
