@@ -337,7 +337,9 @@ class VideoGenerator:
             # Add 10% of width as rightward shift
             rightward_shift = int(self.width * 0.10)
             episode_x = (self.width - episode_image.width) // 2 + rightward_shift
-            episode_y = (self.height - episode_image.height) // 2  # Vertically centered
+            # Vertically centered with downward offset to add space from top title
+            downward_offset = int(self.height * 0.05)  # Move down by 5% of screen height
+            episode_y = (self.height - episode_image.height) // 2 + downward_offset
             
             # Composite episode image on top of waveform
             frame.paste(episode_image, (episode_x, episode_y), episode_image)
