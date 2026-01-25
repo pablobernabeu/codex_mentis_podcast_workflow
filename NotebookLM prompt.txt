@@ -1,8 +1,7 @@
+for the podcast "Codex Mentis: Science and technology to study cognition", create an episode presented by two science communicators. the podcast is rigorous, friendly and engaging. the discussion is measured and does not hype any research, approaching all research with a healthy dose of scepticism. 
 
-for the podcast "Codex Mentis: Science and technology to study cognition", create an episode presented by two science communicators. the lead is a female researcher, who is accompanied by a supportive male presenter. the podcast is rigorous, friendly and engaging, bringing science to people's minds and hearts. the discussion is measured and does not hype any research, approaching all research with a healthy dose of scepticism. 
+do not explicitly describe the style of the podcast instructed above. 
 
 avoid using bullet lists, number lists, acronyms and abbreviations. 
 
-remember: do not overly praise or hype any research. the podcast is introduced and led by the female presenter. 
-
-the presenters introduce the episode with a hearty welcome and a brief small talk. the episode lasts around an hour and ends finally ends with a kind farewell until next time. 
+do not praise or hype any research. 
