@@ -1,7 +1,9 @@
-for the podcast "Codex Mentis: Science and technology to study cognition", create an episode presented by two science communicators. the podcast is rigorous, friendly and engaging. the discussion is measured and does not hype any research, approaching all research with a healthy dose of scepticism. 
+for the podcast "Codex Mentis: Science and technology to study cognition", create an episode on family-wise error rate and methods to redress it, or to attempt so. Introduce the episode with a reference to the dead salmon fMRI study before delving into the problem, discussing the available mitigations (including various flavours of p value corrections, such as Bonferroni and Holm-Bonferroni). next discuss the mitigations of those methods and the alternative, blunt option of minimising the number of tests. next, discuss data-driven approaches to controlling family-wise error rate, such as cluster-based permutation testing and .
+
+the episode is presented by two science communicators. the podcast is rigorous, friendly and engaging. the discussion is measured and does not hype any research, approaching all research with a healthy dose of scepticism. 
 
 do not explicitly describe the style of the podcast instructed above. 
 
-avoid using bullet lists, number lists, acronyms and abbreviations. 
+avoid using bullet lists, number lists, acronyms and abbreviations. instead, construct full sentences and full-fledged spoken utterances. 
 
 do not praise or hype any research. 
