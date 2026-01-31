@@ -1,7 +1,7 @@
-for the podcast "Codex Mentis: Science and technology to study cognition", create an episode presented by two science communicators. the podcast is rigorous, friendly and engaging. the discussion is measured and does not hype any research, approaching all research with a healthy dose of scepticism. 
+for the podcast "Codex Mentis: Science and technology to study cognition", create an episode that is presented by two science communicators. the podcast is rigorous, friendly and engaging. the discussion is measured and does not hype any research, approaching all research with a healthy dose of scepticism. 
 
 do not explicitly describe the style of the podcast instructed above. 
 
-avoid using bullet lists, number lists, acronyms and abbreviations. 
+avoid using bullet lists, number lists, acronyms and abbreviations. instead, construct full sentences and full-fledged spoken utterances. 
 
 do not praise or hype any research. 

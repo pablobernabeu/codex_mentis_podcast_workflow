@@ -1,4 +1,4 @@
-# Audio to Video Converter for Codex Mentis Podcast
+# Materials for Codex Mentis Podcast
 
 A Python tool to convert audio files (WAV, MP3, FLAC, M4A, AAC, OGG, WMA) into visually appealing MP4 videos with animated waveforms, logo animations and professional audio processing. This workflow was vibe-coded by Pablo Bernabeu for the Codex Mentis podcast, available on [Youtube](https://www.youtube.com/playlist?list=PLJ8d7PauMiCs6TkzJfv5cT88oAJhzoy0N), [Spotify](https://open.spotify.com/show/4QXENVjprdaGkTvOexGvD3), [Apple Podcasts](https://podcasts.apple.com/au/podcast/codex-mentis-science-and-tech-to-study-cognition/id1836910507) and [iVoox](https://www.ivoox.com/en/podcast-codex-mentis-science-and-tech-to-study-cognition_sq_f12741704_1.html).
 
