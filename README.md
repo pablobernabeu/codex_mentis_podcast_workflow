@@ -8,7 +8,7 @@ The current repository focusses on the video creation workflow. However, before 
 
 ## Video Creation Workflow
 
-- **Audio Enhancement**: Automatic volume stabilisation optimised for AI-generated speech
+- **Audio Enhancement**: Optional volume stabilisation optimised for AI-generated speech (use `--enhance-audio` to enable)
 - **Professional Intro/Outro**: Royalty-free musical intro and outro added to each episode
 - **Audio Waveform**: Continuous waveform visualisation representing real audio amplitude
 - **Logo Animation**: Subtle breathing animation effect for the podcast logo
@@ -121,6 +121,9 @@ Run the main script:
 
 # Or manually:
 python src/main.py
+
+# To enable audio enhancement (EQ, normalization, click removal):
+python src/main.py --enhance-audio
 ```
 
 **Note:** If FFmpeg isn't found, you may need to restart your terminal or use the `run.sh` script which automatically adds FFmpeg to your PATH.

@@ -284,8 +284,15 @@ class AudioProcessor:
         # Remove padding
         return filtered[window_size//2:-window_size//2]
     
-    def process_audio(self, input_path, output_path=None):
-        """Complete audio processing pipeline."""
+    def process_audio(self, input_path, output_path=None, enhance_audio=False):
+        """Complete audio processing pipeline.
+        
+        Args:
+            input_path: Path to the input audio file
+            output_path: Optional path to save processed audio
+            enhance_audio: If True, apply audio enhancement (EQ, normalization, click removal).
+                          If False (default), only load audio and add intro/outro music.
+        """
         print(f"\n🎵 Processing audio: {os.path.basename(input_path)}")
         print("-" * 50)
         
@@ -294,10 +301,13 @@ class AudioProcessor:
         if audio is None:
             return None, None
         
-        # Apply processing steps optimized for AI-generated speech
-        audio = self.remove_clicks_and_pops(audio, sr)  # Keep this for any digital artifacts
-        audio = self.apply_eq(audio, sr)  # Gentle EQ for speech clarity
-        audio = self.normalize_volume(audio)  # Volume stabilization only
+        if enhance_audio:
+            # Apply processing steps optimized for AI-generated speech
+            audio = self.remove_clicks_and_pops(audio, sr)  # Keep this for any digital artifacts
+            audio = self.apply_eq(audio, sr)  # Gentle EQ for speech clarity
+            audio = self.normalize_volume(audio)  # Volume stabilization only
+        else:
+            print("ℹ Audio enhancement disabled, skipping EQ/normalization/click removal")
         
         # Add intro and outro music for professional presentation
         audio = self.add_intro_outro_music(audio, sr)

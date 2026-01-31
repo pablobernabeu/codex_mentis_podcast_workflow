@@ -20,6 +20,12 @@ class VideoGenerator:
         self.fps = fps
         self.podcast_name = "Codex Mentis: Science and technology to study cognition"
         
+        # Timing for thematic image display pattern (in seconds)
+        self.initial_composite_duration = 30  # Show composite for 30s at start
+        self.fullscreen_image_duration = 300  # Show full-screen image for 5 minutes (300s)
+        self.composite_interval_duration = 30  # Show composite for 30s between full-screen segments
+        self.zoom_transition_duration = 1.5  # Duration of zoom transition in seconds
+        
         # Colors matching the waveform visualizer
         self.colors = {
             'background': (20, 25, 35),
@@ -31,6 +37,51 @@ class VideoGenerator:
             'text_bg': (0, 0, 0, 120),  # Semi-transparent background
             'podcast': (180, 190, 200)  # Cool silver-grey for podcast name
         }
+    
+    def get_view_state(self, time_position, duration):
+        """Determine the current view state based on time position.
+        
+        Returns:
+            tuple: (state, transition_progress)
+            - state: 'composite', 'fullscreen', 'zoom_in', or 'zoom_out'
+            - transition_progress: 0.0-1.0 for transitions, None otherwise
+        """
+        # Pattern: 30s composite -> 5min fullscreen -> 30s composite -> 5min fullscreen -> ...
+        # With zoom transitions between states
+        
+        cycle_duration = self.fullscreen_image_duration + self.composite_interval_duration
+        
+        if time_position < self.initial_composite_duration:
+            # Initial composite period
+            return ('composite', None)
+        
+        # Check if we're in the zoom-in transition after initial composite
+        if time_position < self.initial_composite_duration + self.zoom_transition_duration:
+            progress = (time_position - self.initial_composite_duration) / self.zoom_transition_duration
+            return ('zoom_in', progress)
+        
+        # Time after initial composite and first zoom-in
+        time_after_initial = time_position - self.initial_composite_duration - self.zoom_transition_duration
+        
+        # Calculate which cycle we're in
+        cycle_index = int(time_after_initial / cycle_duration)
+        time_in_cycle = time_after_initial % cycle_duration
+        
+        # Within each cycle: fullscreen (5min) -> zoom_out -> composite (30s) -> zoom_in
+        if time_in_cycle < self.fullscreen_image_duration - self.zoom_transition_duration:
+            # Full-screen image period (before zoom-out starts)
+            return ('fullscreen', None)
+        elif time_in_cycle < self.fullscreen_image_duration:
+            # Zoom-out transition
+            progress = (time_in_cycle - (self.fullscreen_image_duration - self.zoom_transition_duration)) / self.zoom_transition_duration
+            return ('zoom_out', progress)
+        elif time_in_cycle < self.fullscreen_image_duration + self.composite_interval_duration - self.zoom_transition_duration:
+            # Composite period
+            return ('composite', None)
+        else:
+            # Zoom-in transition
+            progress = (time_in_cycle - (self.fullscreen_image_duration + self.composite_interval_duration - self.zoom_transition_duration)) / self.zoom_transition_duration
+            return ('zoom_in', progress)
     
     def load_and_prepare_logo(self, logo_path):
         """Load and prepare the podcast logo for animation."""
@@ -89,16 +140,16 @@ class VideoGenerator:
                 img = img.convert('RGBA')
             
             # Calculate available space with healthy margins
-            # Top margin: account for episode title (approx 20% of height for title + extra spacing)
-            top_margin = int(self.height * 0.20)
-            # Bottom margin: account for podcast name (approx 15% of height for name + extra spacing)
-            bottom_margin = int(self.height * 0.15)
+            # Top margin: account for episode title (approx 10% of height for title + spacing)
+            top_margin = int(self.height * 0.10)
+            # Bottom margin: account for podcast name (approx 10% of height for name + spacing)
+            bottom_margin = int(self.height * 0.10)
             # Left margin: account for logo (approx 500px max logo + margins)
             left_margin = 550
             # Right margin: healthy spacing from edge
             right_margin = 100
             # Additional vertical margins for spacing
-            vertical_spacing = 100
+            vertical_spacing = 40
             
             # Calculate maximum available dimensions
             max_height = self.height - top_margin - bottom_margin - vertical_spacing
@@ -180,11 +231,56 @@ class VideoGenerator:
             print(f"✗ Error loading episode image: {e}")
             return None
     
+    def load_and_prepare_fullscreen_image(self, episode_image_path):
+        """Load and prepare a full-screen version of the episode image for zoom transitions.
+        The image fills the screen while maintaining aspect ratio, with dark background fill."""
+        try:
+            if not episode_image_path or not os.path.exists(episode_image_path):
+                return None
+            
+            # Load image
+            img = Image.open(episode_image_path)
+            
+            # Convert to RGBA if not already
+            if img.mode != 'RGBA':
+                img = img.convert('RGBA')
+            
+            # Calculate dimensions to fill screen while maintaining aspect ratio
+            aspect_ratio = img.width / img.height
+            screen_aspect = self.width / self.height
+            
+            if aspect_ratio > screen_aspect:
+                # Image is wider than screen - fit by width
+                target_width = self.width
+                target_height = int(target_width / aspect_ratio)
+            else:
+                # Image is taller than screen - fit by height
+                target_height = self.height
+                target_width = int(target_height * aspect_ratio)
+            
+            # Resize image maintaining aspect ratio
+            img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+            
+            # Create full-screen frame with background color
+            fullscreen_img = Image.new('RGBA', (self.width, self.height), self.colors['background'])
+            
+            # Center the image on the screen
+            x_offset = (self.width - target_width) // 2
+            y_offset = (self.height - target_height) // 2
+            
+            fullscreen_img.paste(img, (x_offset, y_offset), img)
+            
+            print(f"✓ Full-screen episode image prepared: {target_width}x{target_height}")
+            return fullscreen_img
+        except Exception as e:
+            print(f"✗ Error loading full-screen episode image: {e}")
+            return None
+
     def create_text_overlay(self, episode_title):
         """Create elegant text overlay with episode title at top and podcast name at bottom, with smaller side margins."""
         # Margins - smaller side margins for larger episode title
         margin_x = int(self.width * 0.05)  # Reduced from 10% to 5%
-        margin_y = int(self.height * 0.06)  # Reduced from 10% to 6% to move title up
+        margin_y = int(self.height * 0.03)  # Reduced from 6% to 3% to move title up
         usable_width = self.width - 2 * margin_x
         usable_height = self.height - 2 * margin_y
         
@@ -266,7 +362,7 @@ class VideoGenerator:
         episode_height = episode_bbox[3] - episode_bbox[1]
         # Centered horizontally within margins, positioned lower
         episode_x = margin_x + (usable_width - episode_width) // 2
-        episode_y = margin_y + int(self.height * 0.06)  # Move down by 6% of screen height (increased from 4%)
+        episode_y = margin_y + int(self.height * 0.02)  # Move down by 2% of screen height
         # Draw shadow
         shadow_offset = 3
         shadow_color = (0, 0, 0, 120)
@@ -280,7 +376,7 @@ class VideoGenerator:
         podcast_width = podcast_bbox[2] - podcast_bbox[0]
         podcast_height = podcast_bbox[3] - podcast_bbox[1]
         podcast_x = margin_x + (usable_width - podcast_width) // 2
-        podcast_y = self.height - margin_y - podcast_height - int(self.height * 0.03)  # Move up by 3% of screen height
+        podcast_y = self.height - margin_y - podcast_height - int(self.height * 0.01)  # Move up by 1% of screen height
         # Draw shadow
         draw.text((podcast_x + shadow_offset, podcast_y + shadow_offset), self.podcast_name, font=podcast_font, fill=shadow_color)
         # Draw podcast name in distinct color
@@ -295,8 +391,37 @@ class VideoGenerator:
         scale_factor = base_scale + amplitude * np.sin(animation_progress)
         return scale_factor
     
-    def composite_frame(self, waveform_frame, logo, text_overlay, time_position, duration, episode_image=None):
-        """Composite all elements into final frame with waveform over logo and optional episode image."""
+    def composite_frame(self, waveform_frame, logo, text_overlay, time_position, duration, episode_image=None, fullscreen_image=None):
+        """Composite all elements into final frame with dynamic view transitions.
+        
+        Handles transitions between composite view and full-screen thematic image based on time.
+        """
+        # Determine current view state
+        view_state, transition_progress = self.get_view_state(time_position, duration)
+        
+        # Create the composite frame (always needed for transitions)
+        composite = self._create_composite_view(waveform_frame, logo, text_overlay, time_position, duration, episode_image)
+        
+        # If no fullscreen image is available, always return composite
+        if fullscreen_image is None:
+            return composite
+        
+        # Handle different view states
+        if view_state == 'composite':
+            return composite
+        elif view_state == 'fullscreen':
+            return self._create_fullscreen_view(fullscreen_image)
+        elif view_state == 'zoom_in':
+            # Transition from composite to fullscreen
+            return self._create_zoom_transition(composite, fullscreen_image, transition_progress, zoom_in=True)
+        elif view_state == 'zoom_out':
+            # Transition from fullscreen to composite
+            return self._create_zoom_transition(composite, fullscreen_image, transition_progress, zoom_in=False)
+        
+        return composite
+    
+    def _create_composite_view(self, waveform_frame, logo, text_overlay, time_position, duration, episode_image=None):
+        """Create the standard composite view with logo, waveform, and episode image."""
         # Start with the background color
         frame = Image.new('RGB', (self.width, self.height), (20, 25, 35))  # Background color
         frame = frame.convert('RGBA')
@@ -333,12 +458,10 @@ class VideoGenerator:
         # Add episode-specific image on top of waveform (if provided)
         if episode_image is not None:
             # Position at center with slight rightward shift
-            # Center would be: (self.width - episode_image.width) // 2
-            # Add 10% of width as rightward shift
             rightward_shift = int(self.width * 0.10)
             episode_x = (self.width - episode_image.width) // 2 + rightward_shift
             # Vertically centered with downward offset to add space from top title
-            downward_offset = int(self.height * 0.05)  # Move down by 5% of screen height
+            downward_offset = int(self.height * 0.05)
             episode_y = (self.height - episode_image.height) // 2 + downward_offset
             
             # Composite episode image on top of waveform
@@ -350,6 +473,68 @@ class VideoGenerator:
         # Convert back to RGB array
         frame_rgb = frame.convert('RGB')
         return np.array(frame_rgb)
+    
+    def _create_fullscreen_view(self, fullscreen_image):
+        """Create the full-screen thematic image view."""
+        if fullscreen_image is None:
+            # Fallback to solid background
+            frame = Image.new('RGB', (self.width, self.height), self.colors['background'])
+            return np.array(frame)
+        
+        # Convert fullscreen image to RGB array
+        frame_rgb = fullscreen_image.convert('RGB')
+        return np.array(frame_rgb)
+    
+    def _create_zoom_transition(self, composite_frame, fullscreen_image, progress, zoom_in=True):
+        """Create a smooth zoom transition between composite and fullscreen views.
+        
+        Args:
+            composite_frame: numpy array of the composite view
+            fullscreen_image: PIL Image of the fullscreen view
+            progress: float 0.0-1.0 indicating transition progress
+            zoom_in: if True, zooming from composite to fullscreen; if False, zooming out
+        """
+        # Use easing function for smoother transition
+        # Ease in-out cubic: smoother acceleration and deceleration
+        if progress < 0.5:
+            eased_progress = 4 * progress * progress * progress
+        else:
+            eased_progress = 1 - pow(-2 * progress + 2, 3) / 2
+        
+        if not zoom_in:
+            # Reverse the progress for zoom-out
+            eased_progress = 1 - eased_progress
+        
+        # Convert frames to PIL Images for blending
+        composite_img = Image.fromarray(composite_frame).convert('RGBA')
+        fullscreen_img = fullscreen_image.convert('RGBA') if fullscreen_image else composite_img
+        
+        # Calculate zoom scale (1.0 = normal, up to 1.3 for zoom effect)
+        # During zoom-in: composite zooms in and fades out, fullscreen fades in
+        # During zoom-out: fullscreen zooms out and fades out, composite fades in
+        
+        zoom_scale = 1.0 + (0.15 * eased_progress)  # Subtle zoom from 1.0 to 1.15
+        
+        # Scale the composite image (zoom effect)
+        scaled_width = int(self.width * zoom_scale)
+        scaled_height = int(self.height * zoom_scale)
+        
+        # Zoom the composite view
+        composite_zoomed = composite_img.resize((scaled_width, scaled_height), Image.Resampling.LANCZOS)
+        
+        # Crop to center
+        left = (scaled_width - self.width) // 2
+        top = (scaled_height - self.height) // 2
+        composite_cropped = composite_zoomed.crop((left, top, left + self.width, top + self.height))
+        
+        # Blend composite and fullscreen based on progress
+        # Alpha blend: composite fades out, fullscreen fades in
+        alpha = eased_progress
+        
+        # Create blended result
+        result = Image.blend(composite_cropped.convert('RGB'), fullscreen_img.convert('RGB'), alpha)
+        
+        return np.array(result)
     
     def apply_video_fade(self, frames, fade_duration_seconds=2.0):
         """Apply fade-in and fade-out effects to video frames."""
@@ -388,8 +573,10 @@ class VideoGenerator:
             
             # Load and prepare episode-specific image (optional)
             episode_image = None
+            fullscreen_image = None
             if episode_image_path:
                 episode_image = self.load_and_prepare_episode_image(episode_image_path)
+                fullscreen_image = self.load_and_prepare_fullscreen_image(episode_image_path)
             
             # Create text overlay
             text_overlay = self.create_text_overlay(episode_title)
@@ -400,6 +587,8 @@ class VideoGenerator:
             duration = audio_clip.duration
             
             print(f"🎨 Creating video frames on-demand (Duration: {duration:.1f}s)...")
+            if fullscreen_image:
+                print(f"📸 Thematic image transitions: {self.initial_composite_duration}s composite → {self.fullscreen_image_duration}s fullscreen (repeating)")
             
             # Create a generator for final composited frames
             def final_frame_generator():
@@ -416,9 +605,9 @@ class VideoGenerator:
                         print(f"  Progress: {percent}% ({frame_count}/{total_frames} frames, {time_position:.1f}/{duration:.1f}s)")
                         last_percent = percent
                     
-                    # Composite this frame
+                    # Composite this frame with view state transitions
                     final_frame = self.composite_frame(
-                        waveform_frame, logo, text_overlay, time_position, duration, episode_image
+                        waveform_frame, logo, text_overlay, time_position, duration, episode_image, fullscreen_image
                     )
                     
                     # Apply fade if needed

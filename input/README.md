@@ -28,10 +28,23 @@ Place your WAV audio files here for processing.
 
 The converter will automatically:
 
-1. Enhance audio quality
-2. Stabilize volume levels
-3. Apply noise reduction
-4. Add gentle EQ for speech clarity
-5. Add fade-in/fade-out effects
+1. Add professional intro and outro music
+2. Generate animated waveform visualization
+3. Create MP4 video with logo animation
 
-Simply place your WAV files here and run the main application!
+### Optional Audio Enhancement (disabled by default):
+
+When audio enhancement is enabled, the converter also:
+
+- Enhances audio quality
+- Stabilizes volume levels
+- Applies gentle EQ for speech clarity
+- Removes clicks and pops
+
+To enable audio enhancement, run with `--enhance-audio` flag:
+
+```bash
+python src/main.py --enhance-audio
+```
+
+Simply place your audio files here and run the main application!

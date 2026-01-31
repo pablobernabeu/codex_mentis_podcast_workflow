@@ -26,13 +26,20 @@ class PodcastVideoConverter:
     # Supported audio formats
     SUPPORTED_AUDIO_FORMATS = {'.wav', '.mp3', '.flac', '.m4a', '.aac', '.ogg', '.wma'}
     
-    def __init__(self):
+    def __init__(self, enhance_audio=False):
+        """Initialize the podcast video converter.
+        
+        Args:
+            enhance_audio: If True, apply audio enhancement (EQ, normalization, click removal).
+                          If False (default), only load audio and add intro/outro music.
+        """
         self.base_dir = Path(__file__).parent.parent
         self.input_dir = self.base_dir / "input"
         self.output_dir = self.base_dir / "output"
         self.assets_dir = self.base_dir / "assets"
         self.logo_path = self.assets_dir / "podcast_logo.jpeg"
         self.episode_titles_file = self.base_dir / "episode_titles.json"
+        self.enhance_audio = enhance_audio
         
         # Initialize components
         self.audio_processor = AudioProcessor()
@@ -252,7 +259,7 @@ class PodcastVideoConverter:
             # Step 1: Process and save enhanced audio
             print(f"\n💾 Saving enhanced audio to: {enhanced_audio_path.name}")
             processed_audio, sample_rate = self.audio_processor.process_audio(
-                str(wav_file_path), str(enhanced_audio_path)
+                str(wav_file_path), str(enhanced_audio_path), enhance_audio=self.enhance_audio
             )
             
             if processed_audio is None:
@@ -372,8 +379,21 @@ class PodcastVideoConverter:
 
 def main():
     """Main entry point."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(
+        description="Codex Mentis Podcast Audio to Video Converter"
+    )
+    parser.add_argument(
+        "--enhance-audio",
+        action="store_true",
+        help="Enable audio enhancement (EQ, normalization, click removal). Disabled by default."
+    )
+    
+    args = parser.parse_args()
+    
     try:
-        converter = PodcastVideoConverter()
+        converter = PodcastVideoConverter(enhance_audio=args.enhance_audio)
         converter.run()
     except KeyboardInterrupt:
         print("\n\n👋 Process interrupted by user. Goodbye!")
