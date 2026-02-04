@@ -21,7 +21,7 @@ class VideoGenerator:
         self.podcast_name = "Codex Mentis: Science and technology to study cognition"
         
         # Timing for thematic image display pattern (in seconds)
-        self.initial_composite_duration = 30  # Show composite for 30s at start
+        self.initial_composite_duration = 60  # Show composite for 1 minute at start
         self.fullscreen_image_duration = 300  # Show full-screen image for 5 minutes (300s)
         self.composite_interval_duration = 30  # Show composite for 30s between full-screen segments
         self.zoom_transition_duration = 1.5  # Duration of zoom transition in seconds
@@ -46,8 +46,23 @@ class VideoGenerator:
             - state: 'composite', 'fullscreen', 'zoom_in', or 'zoom_out'
             - transition_progress: 0.0-1.0 for transitions, None otherwise
         """
-        # Pattern: 30s composite -> 5min fullscreen -> 30s composite -> 5min fullscreen -> ...
+        # Pattern: 1min composite -> 5min fullscreen -> 30s composite -> 5min fullscreen -> ...
         # With zoom transitions between states
+        # Always show composite during the last minute
+        
+        final_composite_duration = 60.0  # Last 1 minute always composite
+        
+        # Check if we're in the final composite period
+        time_remaining = duration - time_position
+        if time_remaining <= final_composite_duration:
+            # Last 30 seconds - always show composite
+            return ('composite', None)
+        
+        # Check if we need to zoom out to prepare for final composite
+        if time_remaining <= final_composite_duration + self.zoom_transition_duration:
+            # Zoom out transition to final composite
+            progress = (final_composite_duration + self.zoom_transition_duration - time_remaining) / self.zoom_transition_duration
+            return ('zoom_out', progress)
         
         cycle_duration = self.fullscreen_image_duration + self.composite_interval_duration
         
@@ -139,17 +154,17 @@ class VideoGenerator:
             if img.mode != 'RGBA':
                 img = img.convert('RGBA')
             
-            # Calculate available space with healthy margins
-            # Top margin: account for episode title (approx 10% of height for title + spacing)
-            top_margin = int(self.height * 0.10)
-            # Bottom margin: account for podcast name (approx 10% of height for name + spacing)
-            bottom_margin = int(self.height * 0.10)
+            # Calculate available space - tight margins to stay close to titles
+            # Top margin: minimal space after episode title
+            top_margin = int(self.height * 0.001)  # Nearly zero - 0.1%
+            # Bottom margin: minimal space before podcast name
+            bottom_margin = int(self.height * 0.001)  # Nearly zero - 0.1%
             # Left margin: account for logo (approx 500px max logo + margins)
-            left_margin = 550
-            # Right margin: healthy spacing from edge
-            right_margin = 100
+            left_margin = 520
+            # Right margin: minimal spacing from edge
+            right_margin = 50
             # Additional vertical margins for spacing
-            vertical_spacing = 40
+            vertical_spacing = 2  # Minimal - just 2px
             
             # Calculate maximum available dimensions
             max_height = self.height - top_margin - bottom_margin - vertical_spacing
@@ -277,42 +292,33 @@ class VideoGenerator:
             return None
 
     def create_text_overlay(self, episode_title):
-        """Create elegant text overlay with episode title at top and podcast name at bottom, with smaller side margins."""
-        # Margins - smaller side margins for larger episode title
-        margin_x = int(self.width * 0.05)  # Reduced from 10% to 5%
-        margin_y = int(self.height * 0.03)  # Reduced from 6% to 3% to move title up
+        """Create elegant text overlay with episode title at top and podcast name at bottom, with dynamically optimized font sizes."""
+        # Margins - minimal for maximum text space
+        margin_x = int(self.width * 0.005)  # 0.5% side margins - very minimal horizontal margins
+        margin_y = int(self.height * 0.05)  # 5% top/bottom margins - slight distance from image
         usable_width = self.width - 2 * margin_x
         usable_height = self.height - 2 * margin_y
         
-        # Font sizes - larger starting size for episode title
-        title_font_size = int(0.09 * self.height)  # Increased from 7% to 9% of height
-        podcast_font_size = int(0.045 * self.height)  # Starting size for podcast name
-        
-        # Load fonts first to measure text
-        try:
-            episode_font = ImageFont.truetype("times.ttf", title_font_size)
-        except:
-            try:
-                episode_font = ImageFont.truetype("Georgia.ttf", title_font_size)
-            except:
-                episode_font = ImageFont.load_default()
-        
-        # Create temporary draw object to measure text
-        temp_img = Image.new('RGBA', (1, 1), (0, 0, 0, 0))
-        temp_draw = ImageDraw.Draw(temp_img)
+        # Start with very large font sizes and scale down only if necessary
+        max_title_font_size = int(0.15 * self.height)  # Start at 15% of screen height
+        max_podcast_font_size = int(0.07 * self.height)  # Start at 7% of screen height
+        min_title_font_size = 40  # Don't go below 40px
+        min_podcast_font_size = 25  # Don't go below 25px
         
         # Remove 'Episode: ' prefix if present for measurement
         clean_title = episode_title
         if episode_title.lower().startswith('episode: '):
             clean_title = episode_title[9:]
         
-        # Adaptive font sizing for episode title
-        episode_bbox = temp_draw.textbbox((0, 0), clean_title, font=episode_font)
-        episode_width = episode_bbox[2] - episode_bbox[0]
+        # Create temporary draw object to measure text
+        temp_img = Image.new('RGBA', (1, 1), (0, 0, 0, 0))
+        temp_draw = ImageDraw.Draw(temp_img)
         
-        # If title is too wide, reduce font size
-        while episode_width > usable_width and title_font_size > 20:
-            title_font_size = int(title_font_size * 0.9)
+        # --- Dynamically size episode title ---
+        title_font_size = max_title_font_size
+        episode_font = None
+        
+        while title_font_size >= min_title_font_size:
             try:
                 episode_font = ImageFont.truetype("times.ttf", title_font_size)
             except:
@@ -320,25 +326,24 @@ class VideoGenerator:
                     episode_font = ImageFont.truetype("Georgia.ttf", title_font_size)
                 except:
                     episode_font = ImageFont.load_default()
+                    break
+            
             episode_bbox = temp_draw.textbbox((0, 0), clean_title, font=episode_font)
             episode_width = episode_bbox[2] - episode_bbox[0]
+            episode_height = episode_bbox[3] - episode_bbox[1]
+            
+            # Check if it fits with some breathing room (95% of usable width)
+            if episode_width <= usable_width * 0.95:
+                break
+            
+            # Reduce by smaller increments for finer control
+            title_font_size = int(title_font_size * 0.95)
         
-        # Load podcast font with adaptive sizing
-        try:
-            podcast_font = ImageFont.truetype("arial.ttf", podcast_font_size)  # Sans-serif for distinction
-        except:
-            try:
-                podcast_font = ImageFont.truetype("verdana.ttf", podcast_font_size)  # Alternative sans-serif
-            except:
-                podcast_font = ImageFont.load_default()
+        # --- Dynamically size podcast name ---
+        podcast_font_size = max_podcast_font_size
+        podcast_font = None
         
-        # Adaptive font sizing for podcast name
-        podcast_bbox = temp_draw.textbbox((0, 0), self.podcast_name, font=podcast_font)
-        podcast_width = podcast_bbox[2] - podcast_bbox[0]
-        
-        # If podcast name is too wide, reduce font size
-        while podcast_width > usable_width and podcast_font_size > 15:
-            podcast_font_size = int(podcast_font_size * 0.9)
+        while podcast_font_size >= min_podcast_font_size:
             try:
                 podcast_font = ImageFont.truetype("arial.ttf", podcast_font_size)
             except:
@@ -346,23 +351,30 @@ class VideoGenerator:
                     podcast_font = ImageFont.truetype("verdana.ttf", podcast_font_size)
                 except:
                     podcast_font = ImageFont.load_default()
+                    break
+            
             podcast_bbox = temp_draw.textbbox((0, 0), self.podcast_name, font=podcast_font)
             podcast_width = podcast_bbox[2] - podcast_bbox[0]
+            podcast_height = podcast_bbox[3] - podcast_bbox[1]
+            
+            # Check if it fits with some breathing room
+            if podcast_width <= usable_width * 0.95:
+                break
+            
+            podcast_font_size = int(podcast_font_size * 0.95)
         
         # Create transparent image for text overlays
         text_img = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(text_img)
         
         # --- Episode Title ---
-        # Use the cleaned title (already handled above)
         episode_title = clean_title
-        # Calculate final text size with adjusted font
         episode_bbox = draw.textbbox((0, 0), episode_title, font=episode_font)
         episode_width = episode_bbox[2] - episode_bbox[0]
         episode_height = episode_bbox[3] - episode_bbox[1]
-        # Centered horizontally within margins, positioned lower
+        # Centered horizontally, positioned close to top
         episode_x = margin_x + (usable_width - episode_width) // 2
-        episode_y = margin_y + int(self.height * 0.02)  # Move down by 2% of screen height
+        episode_y = margin_y  # No offset - directly at margin for minimal spacing
         # Draw shadow
         shadow_offset = 3
         shadow_color = (0, 0, 0, 120)
@@ -371,12 +383,11 @@ class VideoGenerator:
         draw.text((episode_x, episode_y), episode_title, font=episode_font, fill=self.colors['accent'])
         
         # --- Podcast Name ---
-        # Calculate final text size with adjusted font
         podcast_bbox = draw.textbbox((0, 0), self.podcast_name, font=podcast_font)
         podcast_width = podcast_bbox[2] - podcast_bbox[0]
         podcast_height = podcast_bbox[3] - podcast_bbox[1]
         podcast_x = margin_x + (usable_width - podcast_width) // 2
-        podcast_y = self.height - margin_y - podcast_height - int(self.height * 0.01)  # Move up by 1% of screen height
+        podcast_y = self.height - margin_y - podcast_height  # No offset - directly at margin for minimal spacing
         # Draw shadow
         draw.text((podcast_x + shadow_offset, podcast_y + shadow_offset), self.podcast_name, font=podcast_font, fill=shadow_color)
         # Draw podcast name in distinct color
@@ -445,24 +456,32 @@ class VideoGenerator:
             # Composite logo onto background
             frame.paste(animated_logo, (logo_x, logo_y), animated_logo)
         
-        # Convert waveform frame to RGBA and make it semi-transparent for overlay effect
+        # Only apply waveform overlay if it's not just a plain background
+        # Check if waveform has visual content (not just background color)
         waveform_rgba = Image.fromarray(waveform_frame).convert('RGBA')
+        waveform_np = np.array(waveform_rgba)
+        background_color = np.array([20, 25, 35, 255])
         
-        # Create a semi-transparent version of the waveform
-        waveform_overlay = Image.new('RGBA', waveform_rgba.size, (0, 0, 0, 0))
-        waveform_overlay.paste(waveform_rgba, (0, 0))
+        # Check if waveform has any pixels different from background
+        has_waveform_content = not np.all(waveform_np[:, :, :3] == background_color[:3])
         
-        # Apply the waveform over the frame with logo
-        frame = Image.alpha_composite(frame, waveform_overlay)
+        if has_waveform_content:
+            # Create a semi-transparent version of the waveform
+            waveform_overlay = Image.new('RGBA', waveform_rgba.size, (0, 0, 0, 0))
+            waveform_overlay.paste(waveform_rgba, (0, 0))
+            # Apply the waveform over the frame with logo
+            frame = Image.alpha_composite(frame, waveform_overlay)
         
         # Add episode-specific image on top of waveform (if provided)
         if episode_image is not None:
-            # Position at center with slight rightward shift
-            rightward_shift = int(self.width * 0.10)
-            episode_x = (self.width - episode_image.width) // 2 + rightward_shift
-            # Vertically centered with downward offset to add space from top title
-            downward_offset = int(self.height * 0.05)
-            episode_y = (self.height - episode_image.height) // 2 + downward_offset
+            # Calculate available horizontal space (accounting for logo on left)
+            logo_space = 520  # Left space occupied by logo
+            available_width = self.width - logo_space
+            # Center in the available space to the right of logo, with slight right margin
+            right_margin_adjustment = int(self.width * 0.02)  # 2% right margin
+            episode_x = logo_space + (available_width - episode_image.width) // 2 - right_margin_adjustment
+            # Vertically centered
+            episode_y = (self.height - episode_image.height) // 2
             
             # Composite episode image on top of waveform
             frame.paste(episode_image, (episode_x, episode_y), episode_image)

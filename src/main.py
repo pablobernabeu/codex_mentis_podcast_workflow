@@ -34,9 +34,11 @@ class PodcastVideoConverter:
                           If False (default), only load audio and add intro/outro music.
         """
         self.base_dir = Path(__file__).parent.parent
-        self.input_dir = self.base_dir / "input"
-        self.output_dir = self.base_dir / "output"
-        self.assets_dir = self.base_dir / "assets"
+        
+        # Check for environment variable overrides (for HPC)
+        self.input_dir = Path(os.environ.get('PODCAST_INPUT_DIR', self.base_dir / "input"))
+        self.output_dir = Path(os.environ.get('PODCAST_OUTPUT_DIR', self.base_dir / "output"))
+        self.assets_dir = Path(os.environ.get('PODCAST_ASSETS_DIR', self.base_dir / "assets"))
         self.logo_path = self.assets_dir / "podcast_logo.jpeg"
         self.episode_titles_file = self.base_dir / "episode_titles.json"
         self.enhance_audio = enhance_audio
@@ -237,7 +239,9 @@ class PodcastVideoConverter:
         sanitized_filename = filename.replace(':', ' -').replace('<', '').replace('>', '').replace('"', "'").replace('|', '-').replace('?', '').replace('*', '').replace('\\', '-').replace('/', '-')
         
         output_path = self.output_dir / f"{sanitized_filename}.mp4"
-        enhanced_audio_path = self.output_dir / f"{sanitized_filename}_enhanced.wav"
+        # Name the audio file based on whether enhancement is enabled
+        audio_suffix = "_enhanced" if self.enhance_audio else "_processed"
+        processed_audio_path = self.output_dir / f"{sanitized_filename}{audio_suffix}.wav"
         
         print(f"\n🚀 Processing: {wav_file_path.name}")
         print("=" * 80)
@@ -256,10 +260,11 @@ class PodcastVideoConverter:
             episode_title = self.get_episode_title(wav_file_path)
             print(f"📝 Episode title: {episode_title}")
             
-            # Step 1: Process and save enhanced audio
-            print(f"\n💾 Saving enhanced audio to: {enhanced_audio_path.name}")
+            # Step 1: Process and save audio (with or without enhancement)
+            audio_type = "enhanced" if self.enhance_audio else "processed"
+            print(f"\n💾 Saving {audio_type} audio to: {processed_audio_path.name}")
             processed_audio, sample_rate = self.audio_processor.process_audio(
-                str(wav_file_path), str(enhanced_audio_path), enhance_audio=self.enhance_audio
+                str(wav_file_path), str(processed_audio_path), enhance_audio=self.enhance_audio
             )
             
             if processed_audio is None:
@@ -271,7 +276,7 @@ class PodcastVideoConverter:
             print(f"⏱️  Audio duration: {duration:.2f} seconds")
             
             waveform_frame_generator = self.waveform_visualizer.generate_waveform_frames(
-                str(enhanced_audio_path), duration  # Pass file path for caching support
+                str(processed_audio_path), duration  # Pass file path for caching support
             )
             
             # Step 3: Create final video
@@ -284,7 +289,7 @@ class PodcastVideoConverter:
                 print(f"📸 Episode image found: {episode_image_path.name}")
             
             success = self.video_generator.create_video(
-                str(enhanced_audio_path),  # Use the saved enhanced audio
+                str(processed_audio_path),  # Use the saved processed audio
                 waveform_frame_generator,
                 episode_title,
                 str(output_path),
@@ -292,15 +297,15 @@ class PodcastVideoConverter:
                 str(episode_image_path) if episode_image_path else None
             )
             
-            # No need to clean up temporary file since we saved the enhanced audio permanently
+            # No need to clean up temporary file since we saved the audio permanently
             
             if success:
                 print(f"✅ Successfully created: {output_path.name}")
-                print(f"✅ Enhanced audio saved: {enhanced_audio_path.name}")
+                print(f"✅ {audio_type.capitalize()} audio saved: {processed_audio_path.name}")
                 video_size_mb = output_path.stat().st_size / (1024 * 1024)
-                audio_size_mb = enhanced_audio_path.stat().st_size / (1024 * 1024)
+                audio_size_mb = processed_audio_path.stat().st_size / (1024 * 1024)
                 print(f"📊 Video file size: {video_size_mb:.1f} MB")
-                print(f"📊 Enhanced audio size: {audio_size_mb:.1f} MB")
+                print(f"📊 {audio_type.capitalize()} audio size: {audio_size_mb:.1f} MB")
                 return True
             else:
                 print("❌ Failed to create video!")
@@ -308,10 +313,109 @@ class PodcastVideoConverter:
                 
         except Exception as e:
             print(f"❌ Error processing file: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
+    def run_batch(self, single_file=None):
+        """Run in batch mode (non-interactive) for HPC/automated processing.
+        
+        Args:
+            single_file: Optional path to a specific file to process.
+                        If None, processes all audio files in input directory.
+        """
+        print("🎙️  Codex Mentis Podcast Video Converter")
+        print("=" * 60)
+        print("BATCH MODE - Non-interactive processing")
+        print()
+        
+        # Check setup
+        print("🔍 Checking setup...")
+        self.check_logo_file()
+        
+        # Determine files to process
+        if single_file:
+            # Process specific file
+            file_path = Path(single_file)
+            if not file_path.is_absolute():
+                # Check if it's in the input directory
+                potential_path = self.input_dir / single_file
+                if potential_path.exists():
+                    file_path = potential_path
+                elif not file_path.exists():
+                    print(f"❌ File not found: {single_file}")
+                    return
+            
+            if not file_path.exists():
+                print(f"❌ File not found: {file_path}")
+                return
+            
+            selected_files = [file_path]
+            print(f"📄 Processing single file: {file_path.name}")
+        else:
+            # Process all files in input directory
+            print("📂 Scanning for audio files...")
+            selected_files = self.get_audio_files()
+            
+            if not selected_files:
+                print("❌ No audio files found in input directory!")
+                print(f"   Input directory: {self.input_dir}")
+                return
+            
+            print(f"✓ Found {len(selected_files)} audio file(s)")
+        
+        # Auto-generate titles for files not in episode_titles.json
+        print("\n📝 Setting up episode titles...")
+        for audio_file in selected_files:
+            filename = audio_file.stem
+            if filename not in self.episode_titles:
+                # Auto-generate title from filename
+                clean_filename = filename
+                if clean_filename.lower().startswith('episode: '):
+                    clean_filename = clean_filename[9:]
+                
+                if '_' in clean_filename:
+                    parts = clean_filename.split('_', 1)
+                    auto_title = f"{parts[0].strip()}: {parts[1].strip()}"
+                else:
+                    auto_title = clean_filename
+                
+                self.episode_titles[filename] = auto_title
+                print(f"   ✓ Auto-generated title for '{filename}': '{auto_title}'")
+            else:
+                print(f"   ✓ Using saved title for '{filename}': '{self.episode_titles[filename]}'")
+        
+        # Save titles
+        self.save_episode_titles()
+        
+        # Process files
+        print(f"\n🎯 Processing {len(selected_files)} file(s)...")
+        print("💫 Optimizations: Intro/outro music will be cached for efficiency")
+        
+        successful = 0
+        failed = 0
+        
+        for i, audio_file in enumerate(selected_files, 1):
+            print(f"\n[{i}/{len(selected_files)}] " + "=" * 40)
+            
+            if self.process_single_file(audio_file):
+                successful += 1
+            else:
+                failed += 1
+        
+        # Summary
+        print("\n" + "=" * 80)
+        print("📋 BATCH PROCESSING SUMMARY")
+        print("-" * 30)
+        print(f"✅ Successful: {successful}")
+        print(f"❌ Failed: {failed}")
+        print(f"📁 Output directory: {self.output_dir}")
+        
+        if successful > 0:
+            print("\n🎉 Batch processing complete!")
+    
     def run(self):
-        """Main application entry point."""
+        """Main application entry point (interactive mode)."""
         print("🎙️  Codex Mentis Podcast Video Converter")
         print("=" * 60)
         print("Converting audio files to MP4 videos with elegant waveform visualisation")
@@ -389,16 +493,34 @@ def main():
         action="store_true",
         help="Enable audio enhancement (EQ, normalization, click removal). Disabled by default."
     )
+    parser.add_argument(
+        "--batch",
+        action="store_true",
+        help="Run in batch mode (non-interactive). Processes all audio files using titles from episode_titles.json."
+    )
+    parser.add_argument(
+        "--file",
+        type=str,
+        help="Process a specific audio file (path or filename in input directory)."
+    )
     
     args = parser.parse_args()
     
     try:
         converter = PodcastVideoConverter(enhance_audio=args.enhance_audio)
-        converter.run()
+        
+        if args.batch or args.file:
+            # Non-interactive batch mode
+            converter.run_batch(single_file=args.file)
+        else:
+            # Interactive mode
+            converter.run()
     except KeyboardInterrupt:
         print("\n\n👋 Process interrupted by user. Goodbye!")
     except Exception as e:
         print(f"\n❌ Unexpected error: {e}")
+        import traceback
+        traceback.print_exc()
         print("Please check your setup and try again.")
 
 

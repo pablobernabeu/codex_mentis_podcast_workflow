@@ -198,6 +198,51 @@ find . -name ".waveform_cache" -type d -exec rm -rf {} +
 rm -rf input/.waveform_cache/your_episode_waveform.pkl
 ```
 
+## HPC Usage (Oxford ARC)
+
+For batch processing on the Oxford ARC HPC cluster, see the dedicated HPC documentation:
+
+- **[docs/hpc_usage.md](docs/hpc_usage.md)** - Comprehensive HPC usage guide
+- **[hpc/README.md](hpc/README.md)** - Quick reference for HPC scripts
+
+### Quick Start on ARC
+
+```bash
+# 1. Set up directory structure (one-time)
+cd ~/podcast/hpc
+./setup_arc_structure.sh
+
+# 2. Activate environment
+source activate_project_env_arc.sh
+
+# 3. Upload audio files
+scp episode.wav USER@arc-login.arc.ox.ac.uk:$DATA/podcast_env/input/
+
+# 4. Submit batch job
+./submit_video_conversion.sh
+
+# 5. Monitor and retrieve
+squeue -u $USER --clusters=htc
+scp USER@arc-login.arc.ox.ac.uk:$DATA/podcast_env/output/*.mp4 ./
+```
+
+### Transcription (Enabled by Default)
+
+The HPC workflow includes audio transcription by default using the [secure_local_HPC_speech_transcription](https://github.com/pablobernabeu/secure_local_HPC_speech_transcription) workflow:
+
+```bash
+# Default: video conversion + transcription
+./submit_video_conversion.sh
+
+# With name masking
+./submit_video_conversion.sh --mask-personal-names
+
+# Disable transcription (video only)
+./submit_video_conversion.sh --no-transcription
+```
+
+See [docs/hpc_usage.md](docs/hpc_usage.md) for transcription setup instructions and all available options.
+
 ## Troubleshooting
 
 ### Logo Issues
