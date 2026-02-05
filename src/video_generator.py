@@ -291,21 +291,31 @@ class VideoGenerator:
             print(f"✗ Error loading full-screen episode image: {e}")
             return None
 
-    def create_text_overlay(self, episode_title):
-        """Create elegant text overlay with episode title at top and podcast name at bottom, with dynamically optimized font sizes."""
-        # Margins - minimal for maximum text space
-        margin_x = int(self.width * 0.005)  # 0.5% side margins - very minimal horizontal margins
-        margin_y = int(self.height * 0.05)  # 5% top/bottom margins - slight distance from image
+    def create_text_overlay(self, episode_title, episode_image=None):
+        """Create elegant text overlay with episode title at top and podcast name at bottom.
+        Dynamically sizes fonts to maximize available space between screen edges and thematic image."""
+        
+        # Calculate available vertical space based on whether we have an episode image
+        if episode_image is not None:
+            # Image is vertically centered, so calculate space above and below it
+            image_height = episode_image.height
+            image_top_y = (self.height - image_height) // 2
+            image_bottom_y = image_top_y + image_height
+            
+            # Available space for titles (with small padding from image)
+            vertical_padding = int(self.height * 0.02)  # 2% padding from image
+            available_top_space = image_top_y - vertical_padding
+            available_bottom_space = self.height - image_bottom_y - vertical_padding
+        else:
+            # No image - use percentage-based spacing
+            available_top_space = int(self.height * 0.4)
+            available_bottom_space = int(self.height * 0.4)
+        
+        # Horizontal margins
+        margin_x = int(self.width * 0.005)  # 0.5% side margins
         usable_width = self.width - 2 * margin_x
-        usable_height = self.height - 2 * margin_y
         
-        # Start with very large font sizes and scale down only if necessary
-        max_title_font_size = int(0.15 * self.height)  # Start at 15% of screen height
-        max_podcast_font_size = int(0.07 * self.height)  # Start at 7% of screen height
-        min_title_font_size = 40  # Don't go below 40px
-        min_podcast_font_size = 25  # Don't go below 25px
-        
-        # Remove 'Episode: ' prefix if present for measurement
+        # Remove 'Episode: ' prefix if present
         clean_title = episode_title
         if episode_title.lower().startswith('episode: '):
             clean_title = episode_title[9:]
@@ -314,8 +324,10 @@ class VideoGenerator:
         temp_img = Image.new('RGBA', (1, 1), (0, 0, 0, 0))
         temp_draw = ImageDraw.Draw(temp_img)
         
-        # --- Dynamically size episode title ---
-        title_font_size = max_title_font_size
+        # --- Dynamically size episode title to fill available top space ---
+        # Start large and scale down to fit both width and height constraints
+        title_font_size = int(available_top_space * 0.8)  # Start at 80% of available vertical space
+        min_title_font_size = 40
         episode_font = None
         
         while title_font_size >= min_title_font_size:
@@ -332,15 +344,16 @@ class VideoGenerator:
             episode_width = episode_bbox[2] - episode_bbox[0]
             episode_height = episode_bbox[3] - episode_bbox[1]
             
-            # Check if it fits with some breathing room (95% of usable width)
-            if episode_width <= usable_width * 0.95:
+            # Check if it fits within both width and available vertical space
+            if episode_width <= usable_width * 0.95 and episode_height <= available_top_space * 0.9:
                 break
             
             # Reduce by smaller increments for finer control
             title_font_size = int(title_font_size * 0.95)
         
-        # --- Dynamically size podcast name ---
-        podcast_font_size = max_podcast_font_size
+        # --- Dynamically size podcast name to fill available bottom space ---
+        podcast_font_size = int(available_bottom_space * 0.6)  # Start at 60% of available vertical space
+        min_podcast_font_size = 30
         podcast_font = None
         
         while podcast_font_size >= min_podcast_font_size:
@@ -357,11 +370,12 @@ class VideoGenerator:
             podcast_width = podcast_bbox[2] - podcast_bbox[0]
             podcast_height = podcast_bbox[3] - podcast_bbox[1]
             
-            # Check if it fits with some breathing room
-            if podcast_width <= usable_width * 0.95:
+            # Check if it fits within both width and available vertical space
+            if podcast_width <= usable_width * 0.95 and podcast_height <= available_bottom_space * 0.8:
                 break
             
             podcast_font_size = int(podcast_font_size * 0.95)
+        
         
         # Create transparent image for text overlays
         text_img = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
@@ -372,9 +386,16 @@ class VideoGenerator:
         episode_bbox = draw.textbbox((0, 0), episode_title, font=episode_font)
         episode_width = episode_bbox[2] - episode_bbox[0]
         episode_height = episode_bbox[3] - episode_bbox[1]
-        # Centered horizontally, positioned close to top
+        
+        # Centered horizontally
         episode_x = margin_x + (usable_width - episode_width) // 2
-        episode_y = margin_y  # No offset - directly at margin for minimal spacing
+        
+        # Vertically centered in available top space if we have an image, otherwise use margin
+        if episode_image is not None:
+            episode_y = (available_top_space - episode_height) // 2
+        else:
+            episode_y = int(self.height * 0.05)
+        
         # Draw shadow
         shadow_offset = 3
         shadow_color = (0, 0, 0, 120)
@@ -386,8 +407,17 @@ class VideoGenerator:
         podcast_bbox = draw.textbbox((0, 0), self.podcast_name, font=podcast_font)
         podcast_width = podcast_bbox[2] - podcast_bbox[0]
         podcast_height = podcast_bbox[3] - podcast_bbox[1]
+        
+        # Centered horizontally
         podcast_x = margin_x + (usable_width - podcast_width) // 2
-        podcast_y = self.height - margin_y - podcast_height  # No offset - directly at margin for minimal spacing
+        
+        # Vertically centered in available bottom space if we have an image, otherwise use margin
+        if episode_image is not None:
+            image_bottom_y = (self.height + episode_image.height) // 2
+            podcast_y = image_bottom_y + (available_bottom_space - podcast_height) // 2
+        else:
+            podcast_y = self.height - int(self.height * 0.05) - podcast_height
+        
         # Draw shadow
         draw.text((podcast_x + shadow_offset, podcast_y + shadow_offset), self.podcast_name, font=podcast_font, fill=shadow_color)
         # Draw podcast name in distinct color
@@ -597,8 +627,8 @@ class VideoGenerator:
                 episode_image = self.load_and_prepare_episode_image(episode_image_path)
                 fullscreen_image = self.load_and_prepare_fullscreen_image(episode_image_path)
             
-            # Create text overlay
-            text_overlay = self.create_text_overlay(episode_title)
+            # Create text overlay (pass episode_image for dynamic font sizing)
+            text_overlay = self.create_text_overlay(episode_title, episode_image)
             print("✓ Text overlay created")
             
             # Load audio to get duration
