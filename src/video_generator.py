@@ -10,6 +10,9 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import cv2
 from waveform_visualizer import WaveformVisualizer
 
+# Diagnostic: Print where this code is loaded from (helps verify no caching issues)
+print(f"[DIAGNOSTIC] video_generator.py loaded from: {__file__}")
+
 
 class VideoGenerator:
     """Generates the final MP4 video with logo, waveform, and text overlays."""
@@ -325,56 +328,140 @@ class VideoGenerator:
         temp_draw = ImageDraw.Draw(temp_img)
         
         # --- Dynamically size episode title to fill available top space ---
-        # Start large and scale down to fit both width and height constraints
-        title_font_size = int(available_top_space * 0.8)  # Start at 80% of available vertical space
-        min_title_font_size = 40
+        # Use binary search to find the largest font that fits
+        min_title_font_size = 30
+        max_title_font_size = int(available_top_space * 1.2)  # Start based on available space
+        title_font_size = max_title_font_size
+        best_title_font_size = min_title_font_size
         episode_font = None
         
-        while title_font_size >= min_title_font_size:
-            try:
-                episode_font = ImageFont.truetype("times.ttf", title_font_size)
-            except:
-                try:
-                    episode_font = ImageFont.truetype("Georgia.ttf", title_font_size)
-                except:
-                    episode_font = ImageFont.load_default()
-                    break
+        # Binary search for optimal font size
+        while max_title_font_size - min_title_font_size > 2:
+            title_font_size = (min_title_font_size + max_title_font_size) // 2
             
-            episode_bbox = temp_draw.textbbox((0, 0), clean_title, font=episode_font)
+            # Try to load TrueType font (cross-platform compatible)
+            test_font = None
+            for font_name in [
+                "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",  # Linux
+                "/System/Library/Fonts/Supplemental/Times New Roman.ttf",  # macOS
+                "C:\\Windows\\Fonts\\times.ttf",  # Windows
+                "times.ttf",  # Fallback
+                "Georgia.ttf",
+            ]:
+                try:
+                    test_font = ImageFont.truetype(font_name, title_font_size)
+                    break
+                except:
+                    continue
+            
+            if test_font is None:
+                # Fonts not available - use minimum size and stop
+                print("  ⚠️ TrueType fonts not available, using minimum size")
+                best_title_font_size = min_title_font_size
+                break
+            
+            episode_bbox = temp_draw.textbbox((0, 0), clean_title, font=test_font)
             episode_width = episode_bbox[2] - episode_bbox[0]
             episode_height = episode_bbox[3] - episode_bbox[1]
             
             # Check if it fits within both width and available vertical space
-            if episode_width <= usable_width * 0.95 and episode_height <= available_top_space * 0.9:
-                break
-            
-            # Reduce by smaller increments for finer control
-            title_font_size = int(title_font_size * 0.95)
+            if episode_width <= usable_width * 0.98 and episode_height <= available_top_space * 0.95:
+                # Fits! Try larger
+                best_title_font_size = title_font_size
+                episode_font = test_font
+                min_title_font_size = title_font_size
+            else:
+                # Too big, try smaller
+                max_title_font_size = title_font_size
+        
+        # Use the best size we found
+        title_font_size = best_title_font_size
+        if episode_font is None:
+            # Load final font with best size
+            for font_name in [
+                "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",  # Linux
+                "/System/Library/Fonts/Supplemental/Times New Roman.ttf",  # macOS
+                "C:\\Windows\\Fonts\\times.ttf",  # Windows
+                "times.ttf",
+                "Georgia.ttf",
+            ]:
+                try:
+                    episode_font = ImageFont.truetype(font_name, title_font_size)
+                    break
+                except:
+                    continue
+            if episode_font is None:
+                episode_font = ImageFont.load_default()
+        
+        print(f"  📏 Episode title font size: {title_font_size}px (available space: {available_top_space}px)")
         
         # --- Dynamically size podcast name to fill available bottom space ---
-        podcast_font_size = int(available_bottom_space * 0.6)  # Start at 60% of available vertical space
-        min_podcast_font_size = 30
+        # Use binary search to find the largest font that fits
+        min_podcast_font_size = 20
+        max_podcast_font_size = int(available_bottom_space * 1.0)
+        podcast_font_size = max_podcast_font_size
+        best_podcast_font_size = min_podcast_font_size
         podcast_font = None
         
-        while podcast_font_size >= min_podcast_font_size:
-            try:
-                podcast_font = ImageFont.truetype("arial.ttf", podcast_font_size)
-            except:
-                try:
-                    podcast_font = ImageFont.truetype("verdana.ttf", podcast_font_size)
-                except:
-                    podcast_font = ImageFont.load_default()
-                    break
+        # Binary search for optimal font size
+        while max_podcast_font_size - min_podcast_font_size > 2:
+            podcast_font_size = (min_podcast_font_size + max_podcast_font_size) // 2
             
-            podcast_bbox = temp_draw.textbbox((0, 0), self.podcast_name, font=podcast_font)
+            # Try to load TrueType font (cross-platform compatible)
+            test_font = None
+            for font_name in [
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux
+                "/System/Library/Fonts/Supplemental/Arial.ttf",  # macOS
+                "C:\\Windows\\Fonts\\arial.ttf",  # Windows
+                "arial.ttf",  # Fallback
+                "verdana.ttf",
+            ]:
+                try:
+                    test_font = ImageFont.truetype(font_name, podcast_font_size)
+                    break
+                except:
+                    continue
+            
+            if test_font is None:
+                # Fonts not available - use minimum size and stop
+                print("  ⚠️ TrueType fonts not available, using minimum size")
+                best_podcast_font_size = min_podcast_font_size
+                break
+            
+            podcast_bbox = temp_draw.textbbox((0, 0), self.podcast_name, font=test_font)
             podcast_width = podcast_bbox[2] - podcast_bbox[0]
             podcast_height = podcast_bbox[3] - podcast_bbox[1]
             
             # Check if it fits within both width and available vertical space
-            if podcast_width <= usable_width * 0.95 and podcast_height <= available_bottom_space * 0.8:
-                break
-            
-            podcast_font_size = int(podcast_font_size * 0.95)
+            if podcast_width <= usable_width * 0.98 and podcast_height <= available_bottom_space * 0.95:
+                # Fits! Try larger
+                best_podcast_font_size = podcast_font_size
+                podcast_font = test_font
+                min_podcast_font_size = podcast_font_size
+            else:
+                # Too big, try smaller
+                max_podcast_font_size = podcast_font_size
+        
+        # Use the best size we found
+        podcast_font_size = best_podcast_font_size
+        if podcast_font is None:
+            # Load final font with best size
+            for font_name in [
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux
+                "/System/Library/Fonts/Supplemental/Arial.ttf",  # macOS
+                "C:\\Windows\\Fonts\\arial.ttf",  # Windows
+                "arial.ttf",
+                "verdana.ttf",
+            ]:
+                try:
+                    podcast_font = ImageFont.truetype(font_name, podcast_font_size)
+                    break
+                except:
+                    continue
+            if podcast_font is None:
+                podcast_font = ImageFont.load_default()
+        
+        print(f"  📏 Podcast name font size: {podcast_font_size}px (available space: {available_bottom_space}px)")
         
         
         # Create transparent image for text overlays

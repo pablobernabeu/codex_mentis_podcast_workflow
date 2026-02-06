@@ -265,6 +265,22 @@ fi
 # Change to source directory
 cd "$SRC_DIR" || { echo "❌ Failed to cd to $SRC_DIR"; exit 1; }
 
+echo "   📍 Working directory: $(pwd)"
+echo "   🐍 Python executable: $(which python)"
+echo "   📦 Python version: $(python --version)"
+
+# Show where Python imports will come from
+echo "   📚 Python import paths:"
+python -c "import sys; print('     - ' + '\n     - '.join(sys.path[:5]))"
+
+# Clear Python bytecode cache to ensure latest code is used
+# Note: PYTHONDONTWRITEBYTECODE=1 should prevent cache creation, but clean up just in case
+echo "   🧹 Ensuring no stale bytecode cache in \$HOME/podcast..."
+find "$HOME/podcast/src" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+find "$HOME/podcast/src" -name "*.pyc" -delete 2>/dev/null || true
+echo "   ✅ Source directory cache verified clean"
+echo ""
+
 # Set environment variables for the Python script
 export PODCAST_INPUT_DIR="$AUDIO_INPUT_DIR"
 export PODCAST_OUTPUT_DIR="$OUTPUT_DIR"
