@@ -144,7 +144,7 @@ class VideoGenerator:
             return None
     
     def load_and_prepare_episode_image(self, episode_image_path):
-        """Load and prepare an optional episode-specific image with dark orange gradient frame.
+        """Load and prepare an optional episode-specific image with golden yellow gradient frame.
         Dynamically sizes to fit available space while respecting margins."""
         try:
             if not episode_image_path or not os.path.exists(episode_image_path):
@@ -189,21 +189,21 @@ class VideoGenerator:
             # Resize image maintaining aspect ratio
             img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
             
-            # Create dark orange gradient frame
+            # Create golden yellow gradient frame (matching waveform)
             frame_width = 12  # Frame thickness
             frame_size = (target_width + frame_width * 2, target_height + frame_width * 2)
             
-            # Create gradient frame with multiple dark orange tones
+            # Create gradient frame with golden yellow tones matching the waveform
             frame = Image.new('RGBA', frame_size, (0, 0, 0, 0))
             frame_draw = ImageDraw.Draw(frame)
             
-            # Dark orange gradient colors (from darker to lighter orange)
+            # Golden yellow gradient colors (from darker to lighter, matching waveform palette)
             orange_colors = [
-                (139, 69, 19),   # Saddle brown (darkest)
-                (160, 82, 45),   # Sienna
-                (184, 92, 46),   # Dark orange
-                (205, 102, 51),  # Chocolate
-                (218, 112, 56)   # Light chocolate (lightest)
+                (255, 240, 100),   # Darker golden (darkest)
+                (255, 240, 130),   # Medium golden
+                (255, 245, 160),   # Light golden
+                (255, 250, 180),   # Bright golden
+                (255, 255, 240)    # Brightest golden (lightest)
             ]
             
             # Draw gradient as concentric filled rectangles (from outside to inside)
@@ -224,7 +224,7 @@ class VideoGenerator:
             glow_draw = ImageDraw.Draw(glow)
             glow_draw.rectangle(
                 [10, 10, frame_size[0] + 30, frame_size[1] + 30],
-                fill=(139, 69, 19, 60)  # Semi-transparent dark orange glow
+                fill=(255, 240, 100, 60)  # Semi-transparent golden yellow glow
             )
             glow = glow.filter(ImageFilter.GaussianBlur(radius=15))
             
@@ -242,12 +242,112 @@ class VideoGenerator:
             img_offset = 20 + frame_width
             final_img.paste(img, (img_offset, img_offset), img)
             
-            print(f"✓ Episode image loaded and prepared: {img.size} with dark orange gradient frame")
+            print(f"✓ Episode image loaded and prepared: {img.size} with golden yellow gradient frame")
             print(f"  Available space: {max_width}x{max_height}, Final size: {final_size}")
             return final_img
         except Exception as e:
             print(f"✗ Error loading episode image: {e}")
             return None
+    
+    def add_animated_light_to_frame(self, image, time_position, duration, episode_x, episode_y):
+        """Add a subtle shiny light that travels around the frame in circles.
+        
+        Args:
+            image: PIL Image with the framed thematic image
+            time_position: Current time in seconds
+            duration: Total duration in seconds
+            episode_x: X position of the image on the canvas
+            episode_y: Y position of the image on the canvas
+        
+        Returns:
+            PIL Image with animated light overlay
+        """
+        if image is None:
+            return None
+        
+        # Create an overlay for the light effect
+        light_overlay = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(light_overlay)
+        
+        # Calculate light position around the frame perimeter
+        # Complete one full circle every 4 seconds
+        cycle_duration = 4.0
+        progress = (time_position % cycle_duration) / cycle_duration
+        
+        # Frame dimensions (from load_and_prepare_episode_image)
+        glow_offset = 20  # Outer glow offset
+        frame_width = 12  # Frame thickness
+        frame_center_offset = glow_offset + frame_width // 2  # Center of the 12px frame = 26px
+        
+        # Get the total framed image dimensions
+        img_width = image.width
+        img_height = image.height
+        
+        # Calculate the actual frame rectangle (centered in the 12px border)
+        # Frame spans from offset 20 to offset 32, so center is at 26
+        frame_rect_width = img_width - 2 * frame_center_offset  # Inner perimeter width
+        frame_rect_height = img_height - 2 * frame_center_offset  # Inner perimeter height
+        
+        # Calculate the perimeter path along the center of the frame
+        perimeter = 2 * (frame_rect_width + frame_rect_height)
+        
+        # Start at middle of right side (where waveform touches the frame)
+        # Right side starts at frame_rect_width, middle is at +frame_rect_height/2
+        starting_offset = frame_rect_width + frame_rect_height / 2
+        
+        # Current position along the perimeter, starting from middle-right
+        current_pos = (progress * perimeter + starting_offset) % perimeter
+        
+        # Determine which side of the frame and position along that side
+        # Starting from middle-right, going clockwise: right (down) -> bottom -> left -> top -> right (up to middle)
+        if current_pos < frame_rect_width:
+            # Top edge: moving right along the center of the top frame
+            light_x = episode_x + frame_center_offset + current_pos
+            light_y = episode_y + frame_center_offset
+        elif current_pos < frame_rect_width + frame_rect_height:
+            # Right edge: moving down along the center of the right frame
+            light_x = episode_x + img_width - frame_center_offset
+            light_y = episode_y + frame_center_offset + (current_pos - frame_rect_width)
+        elif current_pos < 2 * frame_rect_width + frame_rect_height:
+            # Bottom edge: moving left along the center of the bottom frame
+            light_x = episode_x + img_width - frame_center_offset - (current_pos - frame_rect_width - frame_rect_height)
+            light_y = episode_y + img_height - frame_center_offset
+        else:
+            # Left edge: moving up along the center of the left frame
+            light_x = episode_x + frame_center_offset
+            light_y = episode_y + img_height - frame_center_offset - (current_pos - 2 * frame_rect_width - frame_rect_height)
+        
+        # Draw the shiny light effect - smaller and more focused on the frame
+        light_color = (255, 255, 255)  # Pure white for the brightest center
+        golden_color = (255, 250, 200)  # Soft golden
+        
+        # Draw multiple concentric circles for smooth glow effect (smaller to fit the frame)
+        # Keep the glow within the 12px frame width
+        draw.ellipse(
+            [light_x - 20, light_y - 20, light_x + 20, light_y + 20],
+            fill=golden_color + (20,)  # Outer glow
+        )
+        draw.ellipse(
+            [light_x - 14, light_y - 14, light_x + 14, light_y + 14],
+            fill=golden_color + (40,)
+        )
+        draw.ellipse(
+            [light_x - 9, light_y - 9, light_x + 9, light_y + 9],
+            fill=(255, 255, 240, 70)
+        )
+        draw.ellipse(
+            [light_x - 5, light_y - 5, light_x + 5, light_y + 5],
+            fill=light_color + (100,)  # Brighter center
+        )
+        draw.ellipse(
+            [light_x - 2, light_y - 2, light_x + 2, light_y + 2],
+            fill=light_color + (140,)  # Brightest core
+        )
+        
+        # Apply Gaussian blur for smooth, natural glow
+        light_overlay = light_overlay.filter(ImageFilter.GaussianBlur(radius=6))
+        
+        return light_overlay
     
     def load_and_prepare_fullscreen_image(self, episode_image_path):
         """Load and prepare a full-screen version of the episode image for zoom transitions.
@@ -294,9 +394,16 @@ class VideoGenerator:
             print(f"✗ Error loading full-screen episode image: {e}")
             return None
 
-    def create_text_overlay(self, episode_title, episode_image=None):
+    def create_text_overlay(self, episode_title, episode_image=None, time_position=0, duration=1):
         """Create elegant text overlay with episode title at top and podcast name at bottom.
-        Dynamically sizes fonts to maximize available space between screen edges and thematic image."""
+        Dynamically sizes fonts to maximize available space between screen edges and thematic image.
+        
+        Args:
+            episode_title: Title text to display
+            episode_image: Optional episode image for layout calculation
+            time_position: Current time position in seconds for animations
+            duration: Total video duration in seconds
+        """
         
         # Calculate available vertical space based on whether we have an episode image
         if episode_image is not None:
@@ -306,7 +413,7 @@ class VideoGenerator:
             image_bottom_y = image_top_y + image_height
             
             # Available space for titles (with small padding from image)
-            vertical_padding = int(self.height * 0.02)  # 2% padding from image
+            vertical_padding = int(self.height * 0.005)  # 0.5% padding from image (minimal margin)
             available_top_space = image_top_y - vertical_padding
             available_bottom_space = self.height - image_bottom_y - vertical_padding
         else:
@@ -334,6 +441,7 @@ class VideoGenerator:
         title_font_size = max_title_font_size
         best_title_font_size = min_title_font_size
         episode_font = None
+        font_loaded_successfully = False
         
         # Binary search for optimal font size
         while max_title_font_size - min_title_font_size > 2:
@@ -343,6 +451,7 @@ class VideoGenerator:
             test_font = None
             for font_name in [
                 "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",  # Linux
+                "/usr/share/fonts/dejavu/DejaVuSerif.ttf",  # Alternative Linux path
                 "/System/Library/Fonts/Supplemental/Times New Roman.ttf",  # macOS
                 "C:\\Windows\\Fonts\\times.ttf",  # Windows
                 "times.ttf",  # Fallback
@@ -350,15 +459,19 @@ class VideoGenerator:
             ]:
                 try:
                     test_font = ImageFont.truetype(font_name, title_font_size)
+                    font_loaded_successfully = True
                     break
-                except:
+                except Exception as e:
                     continue
             
             if test_font is None:
-                # Fonts not available - use minimum size and stop
-                print("  ⚠️ TrueType fonts not available, using minimum size")
-                best_title_font_size = min_title_font_size
-                break
+                # Fonts not available - print warning but continue with PIL default rendering
+                if not font_loaded_successfully:
+                    print(f"  ⚠️ No TrueType fonts available (tried Linux/Mac/Windows paths)")
+                    print(f"     Using PIL ImageDraw text rendering with size {title_font_size}")
+                # Use PIL text drawing instead - create a font-like object
+                test_font = ImageFont.load_default()
+                # For default font, we'll use text drawing directly later
             
             episode_bbox = temp_draw.textbbox((0, 0), clean_title, font=test_font)
             episode_width = episode_bbox[2] - episode_bbox[0]
@@ -411,6 +524,7 @@ class VideoGenerator:
             test_font = None
             for font_name in [
                 "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux
+                "/usr/share/fonts/dejavu/DejaVuSans.ttf",  # Alternative Linux path
                 "/System/Library/Fonts/Supplemental/Arial.ttf",  # macOS
                 "C:\\Windows\\Fonts\\arial.ttf",  # Windows
                 "arial.ttf",  # Fallback
@@ -419,14 +533,12 @@ class VideoGenerator:
                 try:
                     test_font = ImageFont.truetype(font_name, podcast_font_size)
                     break
-                except:
+                except Exception as e:
                     continue
             
             if test_font is None:
-                # Fonts not available - use minimum size and stop
-                print("  ⚠️ TrueType fonts not available, using minimum size")
-                best_podcast_font_size = min_podcast_font_size
-                break
+                # Use PIL default rendering
+                test_font = ImageFont.load_default()
             
             podcast_bbox = temp_draw.textbbox((0, 0), self.podcast_name, font=test_font)
             podcast_width = podcast_bbox[2] - podcast_bbox[0]
@@ -479,16 +591,37 @@ class VideoGenerator:
         
         # Vertically centered in available top space if we have an image, otherwise use margin
         if episode_image is not None:
-            episode_y = (available_top_space - episode_height) // 2
+            # Position title just below the top of the screen with larger gap to image
+            title_to_image_gap = int(self.height * 0.038)  # 3.8% gap (~41px)
+            # Calculate where the image starts
+            image_top_y = (self.height - episode_image.height) // 2
+            # Position title so its bottom edge is at the gap distance from the image top
+            episode_y = image_top_y - title_to_image_gap - episode_height
         else:
             episode_y = int(self.height * 0.05)
         
-        # Draw shadow
+        # Glow pulse effect - subtly varies glow intensity
+        glow_cycle = (time_position / duration) * 2 * np.pi * 0.3  # Slow pulse (0.3 Hz)
+        glow_intensity = 1.0 + 0.4 * np.sin(glow_cycle)  # Varies between 0.6 and 1.4
+        
+        # Draw shadow/glow with pulsing intensity
         shadow_offset = 3
-        shadow_color = (0, 0, 0, 120)
-        draw.text((episode_x + shadow_offset, episode_y + shadow_offset), episode_title, font=episode_font, fill=shadow_color)
-        # Draw title
-        draw.text((episode_x, episode_y), episode_title, font=episode_font, fill=self.colors['accent'])
+        glow_alpha = int(100 * glow_intensity)  # Base 100, varies 60-140
+        shadow_color = (0, 0, 0, min(255, max(0, glow_alpha)))
+        
+        # Multiple shadow layers for glow effect
+        for offset in [5, 4, 3]:
+            glow_layer_alpha = int(glow_alpha * (offset / 5.0) * 0.4)
+            draw.text(
+                (episode_x + offset, episode_y + offset),
+                episode_title,
+                font=episode_font,
+                fill=(0, 0, 0, min(255, max(0, glow_layer_alpha)))
+            )
+        
+        # Draw title in golden yellow (matching waveform colors)
+        golden_yellow = (255, 245, 150)  # Bright golden matching the waveform
+        draw.text((episode_x, episode_y), episode_title, font=episode_font, fill=golden_yellow)
         
         # --- Podcast Name ---
         podcast_bbox = draw.textbbox((0, 0), self.podcast_name, font=podcast_font)
@@ -500,15 +633,36 @@ class VideoGenerator:
         
         # Vertically centered in available bottom space if we have an image, otherwise use margin
         if episode_image is not None:
+            # Position podcast name just above the bottom with minimal gap to image
+            title_to_image_gap = int(self.height * 0.005)  # 0.5% gap (~5px)
             image_bottom_y = (self.height + episode_image.height) // 2
-            podcast_y = image_bottom_y + (available_bottom_space - podcast_height) // 2
+            # Position title so its top edge is at the gap distance from the image bottom
+            podcast_y = image_bottom_y + title_to_image_gap
         else:
             podcast_y = self.height - int(self.height * 0.05) - podcast_height
         
-        # Draw shadow
-        draw.text((podcast_x + shadow_offset, podcast_y + shadow_offset), self.podcast_name, font=podcast_font, fill=shadow_color)
+        # Draw shadow/glow with pulsing intensity for podcast name
+        for offset in [5, 4, 3]:
+            glow_layer_alpha = int(glow_alpha * (offset / 5.0) * 0.4)
+            draw.text(
+                (podcast_x + offset, podcast_y + offset),
+                self.podcast_name,
+                font=podcast_font,
+                fill=(0, 0, 0, min(255, max(0, glow_layer_alpha)))
+            )
+        
         # Draw podcast name in distinct color
         draw.text((podcast_x, podcast_y), self.podcast_name, font=podcast_font, fill=self.colors['podcast'])
+        
+        # Title fade-in effect (first 2 seconds)
+        fade_duration = 2.0
+        if time_position < fade_duration:
+            alpha_multiplier = time_position / fade_duration  # 0.0 to 1.0
+            # Apply fade by modulating alpha channel
+            alpha_channel = text_img.split()[3]  # Get alpha channel
+            alpha_array = np.array(alpha_channel)
+            alpha_array = (alpha_array * alpha_multiplier).astype(np.uint8)
+            text_img.putalpha(Image.fromarray(alpha_array))
         
         return text_img
     
@@ -519,16 +673,51 @@ class VideoGenerator:
         scale_factor = base_scale + amplitude * np.sin(animation_progress)
         return scale_factor
     
-    def composite_frame(self, waveform_frame, logo, text_overlay, time_position, duration, episode_image=None, fullscreen_image=None):
+    def calculate_logo_shake(self, waveform_data, time_position):
+        """Calculate logo shake offset based on audio peaks.
+        
+        Args:
+            waveform_data: Current waveform amplitude data
+            time_position: Current time position
+        
+        Returns:
+            Tuple of (x_offset, y_offset) for logo shake
+        """
+        if waveform_data is None or len(waveform_data) == 0:
+            return (0, 0)
+        
+        # Calculate average intensity from waveform
+        avg_intensity = np.abs(waveform_data).mean()
+        
+        # Detect peaks (loud moments)
+        peak_threshold = 0.15  # Adjust based on your audio levels
+        is_peak = avg_intensity > peak_threshold
+        
+        if is_peak:
+            # Generate small random shake
+            shake_amount = min(avg_intensity * 10, 5)  # Max 5 pixels
+            # Use time-based randomness for smooth shake
+            seed_offset = int(time_position * 100)  # Change seed frequently but deterministically
+            np.random.seed(seed_offset)
+            x_offset = np.random.randint(-shake_amount, shake_amount + 1)
+            y_offset = np.random.randint(-shake_amount, shake_amount + 1)
+            return (int(x_offset), int(y_offset))
+        else:
+            return (0, 0)
+    
+    def composite_frame(self, waveform_frame, logo, text_overlay, time_position, duration, episode_image=None, fullscreen_image=None, waveform_data=None):
         """Composite all elements into final frame with dynamic view transitions.
         
         Handles transitions between composite view and full-screen thematic image based on time.
+        
+        Args:
+            waveform_data: Raw waveform amplitude data for audio-reactive effects
         """
         # Determine current view state
         view_state, transition_progress = self.get_view_state(time_position, duration)
         
         # Create the composite frame (always needed for transitions)
-        composite = self._create_composite_view(waveform_frame, logo, text_overlay, time_position, duration, episode_image)
+        composite = self._create_composite_view(waveform_frame, logo, text_overlay, time_position, duration, episode_image, waveform_data)
         
         # If no fullscreen image is available, always return composite
         if fullscreen_image is None:
@@ -548,7 +737,7 @@ class VideoGenerator:
         
         return composite
     
-    def _create_composite_view(self, waveform_frame, logo, text_overlay, time_position, duration, episode_image=None):
+    def _create_composite_view(self, waveform_frame, logo, text_overlay, time_position, duration, episode_image=None, waveform_data=None):
         """Create the standard composite view with logo, waveform, and episode image."""
         # Start with the background color
         frame = Image.new('RGB', (self.width, self.height), (20, 25, 35))  # Background color
@@ -564,11 +753,17 @@ class VideoGenerator:
             animated_logo = logo.resize(animated_size, Image.Resampling.LANCZOS)
             
             # Position logo on left side, integrated with waveform area
-            logo_x = 50  # Left margin
-            logo_y = self.height // 2 - animated_logo.height // 2  # Vertically centered with waveform
+            base_logo_x = 30  # Left margin (moved further left)
+            base_logo_y = self.height // 2 - animated_logo.height // 2  # Vertically centered with waveform
+            
+            # Apply shake effect on audio peaks
+            shake_x, shake_y = self.calculate_logo_shake(waveform_data, time_position)
+            logo_x = base_logo_x + shake_x
+            logo_y = base_logo_y + shake_y
             
             # Ensure logo doesn't go off screen
             logo_y = max(50, min(self.height - animated_logo.height - 50, logo_y))
+            logo_x = max(10, min(self.width - animated_logo.width - 10, logo_x))
             
             # Composite logo onto background
             frame.paste(animated_logo, (logo_x, logo_y), animated_logo)
@@ -602,6 +797,11 @@ class VideoGenerator:
             
             # Composite episode image on top of waveform
             frame.paste(episode_image, (episode_x, episode_y), episode_image)
+            
+            # Add animated light effect traveling around the frame
+            light_overlay = self.add_animated_light_to_frame(episode_image, time_position, duration, episode_x, episode_y)
+            if light_overlay is not None:
+                frame = Image.alpha_composite(frame, light_overlay)
         
         # Add text overlay (positioned at top as specified)
         frame.paste(text_overlay, (0, 0), text_overlay)
@@ -714,9 +914,8 @@ class VideoGenerator:
                 episode_image = self.load_and_prepare_episode_image(episode_image_path)
                 fullscreen_image = self.load_and_prepare_fullscreen_image(episode_image_path)
             
-            # Create text overlay (pass episode_image for dynamic font sizing)
-            text_overlay = self.create_text_overlay(episode_title, episode_image)
-            print("✓ Text overlay created")
+            # Note: text_overlay will be created dynamically per frame for fade-in and glow pulse effects
+            print("✓ Text overlay will be generated dynamically for animations")
             
             # Load audio to get duration
             audio_clip = AudioFileClip(audio_path)
@@ -732,7 +931,7 @@ class VideoGenerator:
                 total_frames = int(duration * self.fps)
                 last_percent = -1
                 
-                for waveform_frame in waveform_frame_generator:
+                for waveform_frame, waveform_data in waveform_frame_generator:
                     time_position = frame_count / self.fps
                     
                     # Progress reporting (every 5%)
@@ -741,9 +940,12 @@ class VideoGenerator:
                         print(f"  Progress: {percent}% ({frame_count}/{total_frames} frames, {time_position:.1f}/{duration:.1f}s)")
                         last_percent = percent
                     
+                    # Create text overlay dynamically for animations (fade-in, glow pulse)
+                    text_overlay = self.create_text_overlay(episode_title, episode_image, time_position, duration)
+                    
                     # Composite this frame with view state transitions
                     final_frame = self.composite_frame(
-                        waveform_frame, logo, text_overlay, time_position, duration, episode_image, fullscreen_image
+                        waveform_frame, logo, text_overlay, time_position, duration, episode_image, fullscreen_image, waveform_data
                     )
                     
                     # Apply fade if needed

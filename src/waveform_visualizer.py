@@ -28,11 +28,11 @@ class WaveformVisualizer:
             'accent': (255, 240, 100)           # Intense golden accent
         }
         
-        # Waveform parameters - configured for sharp, spiky brainwave appearance
+        # Waveform parameters - configured for dramatic brainwave appearance like reference image
         self.waveform_center_y = height // 2  # Center line aligned with logo center
-        self.waveform_amplitude = 380  # High amplitude for dramatic spikes
-        self.waveform_area_height = 400  # Total height for waveform area
-        self.waveform_line_thickness = 2  # Thin line for sharp, precise brainwave look
+        self.waveform_amplitude = 450  # Very high amplitude for extreme spikes both above and below
+        self.waveform_area_height = 900  # Much taller area to allow full spike range
+        self.waveform_line_thickness = 1  # Ultra-thin line (1px) for sharp, precise brainwave look
         
         # Scrolling waveform parameters
         self.samples_per_pixel = 100  # How many audio samples per pixel
@@ -67,11 +67,14 @@ class WaveformVisualizer:
                 rms_value = np.sqrt(np.mean(chunk**2))
                 # Keep some of the original waveform character
                 avg_value = np.mean(chunk)
-                # Combine RMS and average for sharp, spiky brainwave pattern
-                combined = avg_value * (0.5 + 1.8 * rms_value)  # Higher multiplier for dramatic spikes
-                # Add high-frequency variation for spiky appearance
-                spike_variation = np.random.normal(0, 0.08) * rms_value  # Much more variation for spikes
+                # Combine for EXTREME spiky brainwave pattern - much more dramatic
+                combined = avg_value * (0.3 + 3.5 * rms_value)  # Very high multiplier for extreme spikes
+                # Add dramatic high-frequency variation for very spiky appearance
+                spike_variation = np.random.normal(0, 0.25) * rms_value  # Extreme variation for dramatic spikes
                 combined += spike_variation
+                # Add occasional extreme spikes for brainwave-like appearance
+                if np.random.random() < 0.15:  # 15% chance of extreme spike
+                    combined *= np.random.uniform(1.5, 2.5)  # 50-150% boost
                 downsampled.append(combined)
         
         # Pad or trim to exact width
@@ -119,41 +122,50 @@ class WaveformVisualizer:
         if len(points) < 2:
             return
         
-        # Create thin, bright, spiky brainwave with intense glow
-        for pass_idx in range(6):  # Multiple passes for maximum shine
-            # Thin lines with decreasing thickness for glow effect
-            thickness = max(1, self.waveform_line_thickness + (5 - pass_idx))
+        # Create ultra-thin, extremely bright, dramatically spiky brainwave matching reference image
+        for pass_idx in range(8):  # More passes for maximum glow and brightness
+            # Ultra-thin lines with very subtle thickness variation
+            if pass_idx < 2:
+                thickness = max(1, self.waveform_line_thickness + 3)  # Outer glow slightly thicker
+            else:
+                thickness = 1  # Core is ultra-thin (1px)
             
-            # Choose intensely bright yellow/golden colors
-            if pass_idx == 0:  # Outer glow - brightest white-yellow
+            # Extremely bright yellow/golden colors - even brighter than before
+            if pass_idx == 0:  # Outermost glow - pure bright white-yellow
+                color = [255, 255, 240]
+            elif pass_idx == 1:  # Second glow - very bright yellow
                 color = [255, 255, 220]
-            elif pass_idx == 1:  # Second layer - very bright yellow
-                color = [255, 255, 190]
-            elif pass_idx == 2:  # Third layer - bright golden yellow
-                color = self.colors['waveform_light']
-            elif pass_idx == 3:  # Fourth layer - golden
-                color = self.colors['waveform_mid']
-            elif pass_idx == 4:  # Inner layer - deep golden
-                color = self.colors['accent']
-            else:  # Core - intense golden
-                color = self.colors['waveform_dark']
+            elif pass_idx == 2:  # Third layer - bright lemon yellow
+                color = [255, 255, 200]
+            elif pass_idx == 3:  # Fourth layer - golden yellow
+                color = [255, 250, 180]
+            elif pass_idx == 4:  # Fifth layer - pure golden
+                color = [255, 240, 150]
+            elif pass_idx == 5:  # Sixth layer - deep golden
+                color = [255, 235, 130]
+            elif pass_idx == 6:  # Inner core - intense golden
+                color = [255, 230, 110]
+            else:  # Ultimate core - brightest golden accent
+                color = [255, 240, 100]
             
-            # Draw line segments with full opacity for bright, shiny appearance
+            # Draw line segments with full opacity for maximum brightness
             for i in range(len(points) - 1):
-                # Enhance brightness on high amplitudes for dramatic spikes
-                amp_intensity = min(1.0, abs(amplitude_data[i] if i < len(amplitude_data) else 0) * 20)  # Very high multiplier for spikes
-                brightness_boost = 0.7 + 0.3 * amp_intensity  # Brighter base with spike enhancement
+                # Dramatically enhance brightness on ALL amplitudes for constant glow
+                amp_intensity = min(1.0, abs(amplitude_data[i] if i < len(amplitude_data) else 0) * 30)  # Extreme multiplier
+                brightness_boost = 0.85 + 0.15 * amp_intensity  # Very bright base
                 adjusted_color = [int(c * brightness_boost) for c in color] + [255]  # Full opacity
                 
                 cv2.line(frame, points[i], points[i + 1], adjusted_color, thickness)
         
-        # Intense glow effect on spikes for brainwave appearance
+        # EXTREME glow effect on spikes for dramatic brainwave appearance
         for i, (point, amp) in enumerate(zip(points, amplitude_data)):
-            if abs(amp) > 0.04:  # Lower threshold to highlight more spikes
-                glow_intensity = min(255, int(255 * abs(amp) * 1.2))  # Very intense glow
-                # Bright yellow-white glow
-                glow_color = [255, 255, min(255, 150 + glow_intensity)] + [255]  # Full opacity
-                cv2.circle(frame, point, 8, glow_color, -1)  # Larger glow for dramatic effect
+            if abs(amp) > 0.03:  # Even lower threshold for more glow points
+                glow_intensity = min(255, int(255 * abs(amp) * 2.0))  # Double intensity
+                # Ultra-bright yellow-white glow
+                glow_color = [255, 255, min(255, 180 + glow_intensity // 2)] + [255]  # Full opacity, very bright
+                # Larger glow circles for extreme spikes
+                glow_size = 10 if abs(amp) > 0.1 else 6
+                cv2.circle(frame, point, glow_size, glow_color, -1)
     
     def add_progress_bar(self, frame, time_position, total_duration):
         """Add a subtle progress bar at the bottom."""
@@ -303,6 +315,7 @@ class WaveformVisualizer:
                 frame = self.create_waveform_frame(waveform_data, time_position, total_duration)
                 frame = self.add_progress_bar(frame, time_position, total_duration)
                 
-                yield frame
+                # Yield both frame and waveform data for audio-reactive effects
+                yield frame, waveform_data
         
         return frame_generator()
