@@ -74,7 +74,7 @@ def main():
         
         # Create text overlay using generator's method (now with episode_image for dynamic sizing)
         # Pass time_position for testing effects (1.5 seconds to show partial fade-in and some glow)
-        text_overlay = generator.create_text_overlay(episode_title, episode_image, time_position=1.5, duration=100)
+        text_overlay, _ = generator.create_text_overlay(episode_title, episode_image, time_position=1.5, duration=100)
         
         # Create a plain background waveform (no actual waveform visualization)
         waveform_img = Image.new('RGB', (generator.width, generator.height), (20, 25, 35))

@@ -9,7 +9,7 @@
 #SBATCH --error=logs/video_conversion_%A_%a.err
 #SBATCH --clusters=htc
 #SBATCH --partition=short
-#SBATCH --time=04:00:00
+#SBATCH --time=08:00:00
 #SBATCH --mem=32G
 #SBATCH --cpus-per-task=4
 # Note: This workflow is CPU-based (no GPU required)
@@ -302,11 +302,11 @@ if [ -n "$SINGLE_FILE" ]; then
     CONVERSION_CMD="$CONVERSION_CMD --file \"$AUDIO_FILE\""
 fi
 
-# Run the conversion with timeout (3 hours max)
+# Run the conversion with timeout (6 hours max)
 echo "Running: $CONVERSION_CMD"
 echo "---"
 
-eval timeout 10800 $CONVERSION_CMD
+eval timeout 21600 $CONVERSION_CMD
 
 CONVERSION_EXIT_CODE=$?
 
@@ -353,7 +353,7 @@ if [ "$TRANSCRIPTION" = true ]; then
         echo "   Options:$TRANSCRIPTION_ARGS"
         echo "   ---"
         
-        timeout 10800 python "$TRANSCRIPTION_SCRIPT" "$AUDIO_FILE" $TRANSCRIPTION_ARGS
+        timeout 21600 python "$TRANSCRIPTION_SCRIPT" "$AUDIO_FILE" $TRANSCRIPTION_ARGS
         TRANSCRIPTION_EXIT_CODE=$?
         
         echo "   ---"
@@ -401,7 +401,7 @@ if [ $CONVERSION_EXIT_CODE -eq 0 ]; then
     fi
     
 elif [ $CONVERSION_EXIT_CODE -eq 124 ]; then
-    echo "❌ TIMEOUT: Conversion exceeded 3 hour limit"
+    echo "❌ TIMEOUT: Conversion exceeded 6 hour limit"
 else
     echo "❌ FAILURE: Conversion failed with exit code $CONVERSION_EXIT_CODE"
 fi

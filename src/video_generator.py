@@ -162,12 +162,12 @@ class VideoGenerator:
             top_margin = int(self.height * 0.001)  # Nearly zero - 0.1%
             # Bottom margin: minimal space before podcast name
             bottom_margin = int(self.height * 0.001)  # Nearly zero - 0.1%
-            # Left margin: account for logo (approx 500px max logo + margins)
+            # Left margin: account for logo
             left_margin = 520
             # Right margin: minimal spacing from edge
             right_margin = 50
             # Additional vertical margins for spacing
-            vertical_spacing = 2  # Minimal - just 2px
+            vertical_spacing = 2
             
             # Calculate maximum available dimensions
             max_height = self.height - top_margin - bottom_margin - vertical_spacing
@@ -199,11 +199,11 @@ class VideoGenerator:
             
             # Golden yellow gradient colors (from darker to lighter, matching waveform palette)
             orange_colors = [
-                (255, 240, 100),   # Darker golden (darkest)
+                (255, 240, 100),   # Darker golden
                 (255, 240, 130),   # Medium golden
                 (255, 245, 160),   # Light golden
                 (255, 250, 180),   # Bright golden
-                (255, 255, 240)    # Brightest golden (lightest)
+                (255, 255, 240)    # Brightest golden
             ]
             
             # Draw gradient as concentric filled rectangles (from outside to inside)
@@ -277,13 +277,13 @@ class VideoGenerator:
         # Frame dimensions (from load_and_prepare_episode_image)
         glow_offset = 20  # Outer glow offset
         frame_width = 12  # Frame thickness
-        frame_center_offset = glow_offset + frame_width // 2  # Center of the 12px frame = 26px
+        frame_center_offset = glow_offset + frame_width // 2  # Center of the frame
         
         # Get the total framed image dimensions
         img_width = image.width
         img_height = image.height
         
-        # Calculate the actual frame rectangle (centered in the 12px border)
+        # Calculate the actual frame rectangle (centered in the border)
         # Frame spans from offset 20 to offset 32, so center is at 26
         frame_rect_width = img_width - 2 * frame_center_offset  # Inner perimeter width
         frame_rect_height = img_height - 2 * frame_center_offset  # Inner perimeter height
@@ -318,11 +318,11 @@ class VideoGenerator:
             light_y = episode_y + img_height - frame_center_offset - (current_pos - 2 * frame_rect_width - frame_rect_height)
         
         # Draw the shiny light effect - smaller and more focused on the frame
-        light_color = (255, 255, 255)  # Pure white for the brightest center
+        light_color = (255, 255, 255)  # Pure white
         golden_color = (255, 250, 200)  # Soft golden
         
         # Draw multiple concentric circles for smooth glow effect (smaller to fit the frame)
-        # Keep the glow within the 12px frame width
+        # Keep the glow within the frame width
         draw.ellipse(
             [light_x - 20, light_y - 20, light_x + 20, light_y + 20],
             fill=golden_color + (20,)  # Outer glow
@@ -341,7 +341,7 @@ class VideoGenerator:
         )
         draw.ellipse(
             [light_x - 2, light_y - 2, light_x + 2, light_y + 2],
-            fill=light_color + (140,)  # Brightest core
+            fill=light_color + (140,)  # Core
         )
         
         # Apply Gaussian blur for smooth, natural glow
@@ -394,7 +394,7 @@ class VideoGenerator:
             print(f"✗ Error loading full-screen episode image: {e}")
             return None
 
-    def create_text_overlay(self, episode_title, episode_image=None, time_position=0, duration=1):
+    def create_text_overlay(self, episode_title, episode_image=None, time_position=0, duration=1, cached_fonts=None):
         """Create elegant text overlay with episode title at top and podcast name at bottom.
         Dynamically sizes fonts to maximize available space between screen edges and thematic image.
         
@@ -403,202 +403,234 @@ class VideoGenerator:
             episode_image: Optional episode image for layout calculation
             time_position: Current time position in seconds for animations
             duration: Total video duration in seconds
+            cached_fonts: Dict with pre-computed font info to skip binary search
         """
         
-        # Calculate available vertical space based on whether we have an episode image
-        if episode_image is not None:
-            # Image is vertically centered, so calculate space above and below it
-            image_height = episode_image.height
-            image_top_y = (self.height - image_height) // 2
-            image_bottom_y = image_top_y + image_height
-            
-            # Available space for titles (with small padding from image)
-            vertical_padding = int(self.height * 0.005)  # 0.5% padding from image (minimal margin)
-            available_top_space = image_top_y - vertical_padding
-            available_bottom_space = self.height - image_bottom_y - vertical_padding
+        # If fonts are already cached, skip the expensive binary search
+        if cached_fonts is not None:
+            episode_font = cached_fonts['episode_font']
+            podcast_font = cached_fonts['podcast_font']
+            episode_x = cached_fonts['episode_x']
+            episode_y = cached_fonts['episode_y']
+            podcast_x = cached_fonts['podcast_x']
+            podcast_y = cached_fonts['podcast_y']
+            clean_title = cached_fonts['clean_title']
         else:
-            # No image - use percentage-based spacing
-            available_top_space = int(self.height * 0.4)
-            available_bottom_space = int(self.height * 0.4)
-        
-        # Horizontal margins
-        margin_x = int(self.width * 0.005)  # 0.5% side margins
-        usable_width = self.width - 2 * margin_x
-        
-        # Remove 'Episode: ' prefix if present
-        clean_title = episode_title
-        if episode_title.lower().startswith('episode: '):
-            clean_title = episode_title[9:]
-        
-        # Create temporary draw object to measure text
-        temp_img = Image.new('RGBA', (1, 1), (0, 0, 0, 0))
-        temp_draw = ImageDraw.Draw(temp_img)
-        
-        # --- Dynamically size episode title to fill available top space ---
-        # Use binary search to find the largest font that fits
-        min_title_font_size = 30
-        max_title_font_size = int(available_top_space * 1.2)  # Start based on available space
-        title_font_size = max_title_font_size
-        best_title_font_size = min_title_font_size
-        episode_font = None
-        font_loaded_successfully = False
-        
-        # Binary search for optimal font size
-        while max_title_font_size - min_title_font_size > 2:
-            title_font_size = (min_title_font_size + max_title_font_size) // 2
+            # First-time calculation - run binary search for optimal font sizes
+            # Calculate available vertical space based on whether we have an episode image
+            if episode_image is not None:
+                # Image is vertically centered, so calculate space above and below it
+                image_height = episode_image.height
+                image_top_y = (self.height - image_height) // 2
+                image_bottom_y = image_top_y + image_height
+                
+                # Available space for titles (with small padding from image)
+                vertical_padding = int(self.height * 0.005)  # 0.5% padding from image (minimal margin)
+                available_top_space = image_top_y - vertical_padding
+                available_bottom_space = self.height - image_bottom_y - vertical_padding
+            else:
+                # No image - use percentage-based spacing
+                available_top_space = int(self.height * 0.4)
+                available_bottom_space = int(self.height * 0.4)
             
-            # Try to load TrueType font (cross-platform compatible)
-            test_font = None
-            for font_name in [
-                "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",  # Linux
-                "/usr/share/fonts/dejavu/DejaVuSerif.ttf",  # Alternative Linux path
-                "/System/Library/Fonts/Supplemental/Times New Roman.ttf",  # macOS
-                "C:\\Windows\\Fonts\\times.ttf",  # Windows
-                "times.ttf",  # Fallback
-                "Georgia.ttf",
-            ]:
-                try:
-                    test_font = ImageFont.truetype(font_name, title_font_size)
-                    font_loaded_successfully = True
-                    break
-                except Exception as e:
-                    continue
+            # Horizontal margins
+            margin_x = int(self.width * 0.005)  # 0.5% side margins
+            usable_width = self.width - 2 * margin_x
             
-            if test_font is None:
-                # Fonts not available - print warning but continue with PIL default rendering
-                if not font_loaded_successfully:
-                    print(f"  ⚠️ No TrueType fonts available (tried Linux/Mac/Windows paths)")
-                    print(f"     Using PIL ImageDraw text rendering with size {title_font_size}")
-                # Use PIL text drawing instead - create a font-like object
-                test_font = ImageFont.load_default()
-                # For default font, we'll use text drawing directly later
+            # Remove 'Episode: ' prefix if present
+            clean_title = episode_title
+            if episode_title.lower().startswith('episode: '):
+                clean_title = episode_title[9:]
             
-            episode_bbox = temp_draw.textbbox((0, 0), clean_title, font=test_font)
+            # Create temporary draw object to measure text
+            temp_img = Image.new('RGBA', (1, 1), (0, 0, 0, 0))
+            temp_draw = ImageDraw.Draw(temp_img)
+            
+            # --- Dynamically size episode title to fill available top space ---
+            # Use binary search to find the largest font that fits
+            min_title_font_size = 30
+            max_title_font_size = int(available_top_space * 1.2)  # Start based on available space
+            title_font_size = max_title_font_size
+            best_title_font_size = min_title_font_size
+            episode_font = None
+            font_loaded_successfully = False
+            
+            # Binary search for optimal font size
+            while max_title_font_size - min_title_font_size > 2:
+                title_font_size = (min_title_font_size + max_title_font_size) // 2
+                
+                # Try to load TrueType font (cross-platform compatible)
+                test_font = None
+                for font_name in [
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",  # Linux
+                    "/usr/share/fonts/dejavu/DejaVuSerif.ttf",  # Alternative Linux path
+                    "/System/Library/Fonts/Supplemental/Times New Roman.ttf",  # macOS
+                    "C:\\Windows\\Fonts\\times.ttf",  # Windows
+                    "times.ttf",  # Fallback
+                    "Georgia.ttf",
+                ]:
+                    try:
+                        test_font = ImageFont.truetype(font_name, title_font_size)
+                        font_loaded_successfully = True
+                        break
+                    except Exception as e:
+                        continue
+                
+                if test_font is None:
+                    # Fonts not available - print warning but continue with PIL default rendering
+                    if not font_loaded_successfully:
+                        print(f"  ⚠️ No TrueType fonts available (tried Linux/Mac/Windows paths)")
+                        print(f"     Using PIL ImageDraw text rendering with size {title_font_size}")
+                    # Use PIL text drawing instead - create a font-like object
+                    test_font = ImageFont.load_default()
+                    # For default font, we'll use text drawing directly later
+                
+                episode_bbox = temp_draw.textbbox((0, 0), clean_title, font=test_font)
+                episode_width = episode_bbox[2] - episode_bbox[0]
+                episode_height = episode_bbox[3] - episode_bbox[1]
+                
+                # Check if it fits within both width and available vertical space
+                if episode_width <= usable_width * 0.98 and episode_height <= available_top_space * 0.95:
+                    # Fits! Try larger
+                    best_title_font_size = title_font_size
+                    episode_font = test_font
+                    min_title_font_size = title_font_size
+                else:
+                    # Too big, try smaller
+                    max_title_font_size = title_font_size
+            
+            # Use the best size we found
+            title_font_size = best_title_font_size
+            if episode_font is None:
+                # Load final font with best size
+                for font_name in [
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",  # Linux
+                    "/System/Library/Fonts/Supplemental/Times New Roman.ttf",  # macOS
+                    "C:\\Windows\\Fonts\\times.ttf",  # Windows
+                    "times.ttf",
+                    "Georgia.ttf",
+                ]:
+                    try:
+                        episode_font = ImageFont.truetype(font_name, title_font_size)
+                        break
+                    except:
+                        continue
+                if episode_font is None:
+                    episode_font = ImageFont.load_default()
+            
+            print(f"  📏 Episode title font size: {title_font_size}px (available space: {available_top_space}px)")
+            
+            # --- Dynamically size podcast name to fill available bottom space ---
+            # Use binary search to find the largest font that fits
+            min_podcast_font_size = 20
+            max_podcast_font_size = int(available_bottom_space * 1.0)
+            podcast_font_size = max_podcast_font_size
+            best_podcast_font_size = min_podcast_font_size
+            podcast_font = None
+            
+            # Binary search for optimal font size
+            while max_podcast_font_size - min_podcast_font_size > 2:
+                podcast_font_size = (min_podcast_font_size + max_podcast_font_size) // 2
+                
+                # Try to load TrueType font (cross-platform compatible)
+                test_font = None
+                for font_name in [
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux
+                    "/usr/share/fonts/dejavu/DejaVuSans.ttf",  # Alternative Linux path
+                    "/System/Library/Fonts/Supplemental/Arial.ttf",  # macOS
+                    "C:\\Windows\\Fonts\\arial.ttf",  # Windows
+                    "arial.ttf",  # Fallback
+                    "verdana.ttf",
+                ]:
+                    try:
+                        test_font = ImageFont.truetype(font_name, podcast_font_size)
+                        break
+                    except Exception as e:
+                        continue
+                
+                if test_font is None:
+                    # Use PIL default rendering
+                    test_font = ImageFont.load_default()
+                
+                podcast_bbox = temp_draw.textbbox((0, 0), self.podcast_name, font=test_font)
+                podcast_width = podcast_bbox[2] - podcast_bbox[0]
+                podcast_height = podcast_bbox[3] - podcast_bbox[1]
+                
+                # Check if it fits within both width and available vertical space
+                if podcast_width <= usable_width * 0.98 and podcast_height <= available_bottom_space * 0.95:
+                    # Fits! Try larger
+                    best_podcast_font_size = podcast_font_size
+                    podcast_font = test_font
+                    min_podcast_font_size = podcast_font_size
+                else:
+                    # Too big, try smaller
+                    max_podcast_font_size = podcast_font_size
+            
+            # Use the best size we found
+            podcast_font_size = best_podcast_font_size
+            if podcast_font is None:
+                # Load final font with best size
+                for font_name in [
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux
+                    "/System/Library/Fonts/Supplemental/Arial.ttf",  # macOS
+                    "C:\\Windows\\Fonts\\arial.ttf",  # Windows
+                    "arial.ttf",
+                    "verdana.ttf",
+                ]:
+                    try:
+                        podcast_font = ImageFont.truetype(font_name, podcast_font_size)
+                        break
+                    except:
+                        continue
+                if podcast_font is None:
+                    podcast_font = ImageFont.load_default()
+            
+            print(f"  📏 Podcast name font size: {podcast_font_size}px (available space: {available_bottom_space}px)")
+            
+            # Calculate positions for text
+            # Horizontal margins
+            episode_bbox = temp_draw.textbbox((0, 0), clean_title, font=episode_font)
             episode_width = episode_bbox[2] - episode_bbox[0]
             episode_height = episode_bbox[3] - episode_bbox[1]
             
-            # Check if it fits within both width and available vertical space
-            if episode_width <= usable_width * 0.98 and episode_height <= available_top_space * 0.95:
-                # Fits! Try larger
-                best_title_font_size = title_font_size
-                episode_font = test_font
-                min_title_font_size = title_font_size
+            # Centered horizontally
+            episode_x = margin_x + (usable_width - episode_width) // 2
+            
+            # Vertically centered in available top space if we have an image, otherwise use margin
+            if episode_image is not None:
+                # Position title just below the top of the screen with larger gap to image
+                title_to_image_gap = int(self.height * 0.038)  # Gap between title and image
+                # Calculate where the image starts
+                image_top_y = (self.height - episode_image.height) // 2
+                # Position title so its bottom edge is at the gap distance from the image top
+                episode_y = image_top_y - title_to_image_gap - episode_height
             else:
-                # Too big, try smaller
-                max_title_font_size = title_font_size
-        
-        # Use the best size we found
-        title_font_size = best_title_font_size
-        if episode_font is None:
-            # Load final font with best size
-            for font_name in [
-                "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",  # Linux
-                "/System/Library/Fonts/Supplemental/Times New Roman.ttf",  # macOS
-                "C:\\Windows\\Fonts\\times.ttf",  # Windows
-                "times.ttf",
-                "Georgia.ttf",
-            ]:
-                try:
-                    episode_font = ImageFont.truetype(font_name, title_font_size)
-                    break
-                except:
-                    continue
-            if episode_font is None:
-                episode_font = ImageFont.load_default()
-        
-        print(f"  📏 Episode title font size: {title_font_size}px (available space: {available_top_space}px)")
-        
-        # --- Dynamically size podcast name to fill available bottom space ---
-        # Use binary search to find the largest font that fits
-        min_podcast_font_size = 20
-        max_podcast_font_size = int(available_bottom_space * 1.0)
-        podcast_font_size = max_podcast_font_size
-        best_podcast_font_size = min_podcast_font_size
-        podcast_font = None
-        
-        # Binary search for optimal font size
-        while max_podcast_font_size - min_podcast_font_size > 2:
-            podcast_font_size = (min_podcast_font_size + max_podcast_font_size) // 2
+                episode_y = int(self.height * 0.05)
             
-            # Try to load TrueType font (cross-platform compatible)
-            test_font = None
-            for font_name in [
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux
-                "/usr/share/fonts/dejavu/DejaVuSans.ttf",  # Alternative Linux path
-                "/System/Library/Fonts/Supplemental/Arial.ttf",  # macOS
-                "C:\\Windows\\Fonts\\arial.ttf",  # Windows
-                "arial.ttf",  # Fallback
-                "verdana.ttf",
-            ]:
-                try:
-                    test_font = ImageFont.truetype(font_name, podcast_font_size)
-                    break
-                except Exception as e:
-                    continue
-            
-            if test_font is None:
-                # Use PIL default rendering
-                test_font = ImageFont.load_default()
-            
-            podcast_bbox = temp_draw.textbbox((0, 0), self.podcast_name, font=test_font)
+            # Podcast name positions
+            podcast_bbox = temp_draw.textbbox((0, 0), self.podcast_name, font=podcast_font)
             podcast_width = podcast_bbox[2] - podcast_bbox[0]
             podcast_height = podcast_bbox[3] - podcast_bbox[1]
             
-            # Check if it fits within both width and available vertical space
-            if podcast_width <= usable_width * 0.98 and podcast_height <= available_bottom_space * 0.95:
-                # Fits! Try larger
-                best_podcast_font_size = podcast_font_size
-                podcast_font = test_font
-                min_podcast_font_size = podcast_font_size
+            # Centered horizontally
+            podcast_x = margin_x + (usable_width - podcast_width) // 2
+            
+            # Vertically centered in available bottom space if we have an image, otherwise use margin
+            if episode_image is not None:
+                # Position podcast name just above the bottom with minimal gap to image
+                title_to_image_gap = int(self.height * 0.005)  # Minimal gap
+                image_bottom_y = (self.height + episode_image.height) // 2
+                # Position title so its top edge is at the gap distance from the image bottom
+                podcast_y = image_bottom_y + title_to_image_gap
             else:
-                # Too big, try smaller
-                max_podcast_font_size = podcast_font_size
+                podcast_y = self.height - int(self.height * 0.05) - podcast_height
         
-        # Use the best size we found
-        podcast_font_size = best_podcast_font_size
-        if podcast_font is None:
-            # Load final font with best size
-            for font_name in [
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux
-                "/System/Library/Fonts/Supplemental/Arial.ttf",  # macOS
-                "C:\\Windows\\Fonts\\arial.ttf",  # Windows
-                "arial.ttf",
-                "verdana.ttf",
-            ]:
-                try:
-                    podcast_font = ImageFont.truetype(font_name, podcast_font_size)
-                    break
-                except:
-                    continue
-            if podcast_font is None:
-                podcast_font = ImageFont.load_default()
-        
-        print(f"  📏 Podcast name font size: {podcast_font_size}px (available space: {available_bottom_space}px)")
-        
-        
+        # Only build the text image with the cached/computed fonts
         # Create transparent image for text overlays
         text_img = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(text_img)
         
-        # --- Episode Title ---
-        episode_title = clean_title
-        episode_bbox = draw.textbbox((0, 0), episode_title, font=episode_font)
-        episode_width = episode_bbox[2] - episode_bbox[0]
-        episode_height = episode_bbox[3] - episode_bbox[1]
-        
-        # Centered horizontally
-        episode_x = margin_x + (usable_width - episode_width) // 2
-        
-        # Vertically centered in available top space if we have an image, otherwise use margin
-        if episode_image is not None:
-            # Position title just below the top of the screen with larger gap to image
-            title_to_image_gap = int(self.height * 0.038)  # 3.8% gap (~41px)
-            # Calculate where the image starts
-            image_top_y = (self.height - episode_image.height) // 2
-            # Position title so its bottom edge is at the gap distance from the image top
-            episode_y = image_top_y - title_to_image_gap - episode_height
-        else:
-            episode_y = int(self.height * 0.05)
+        # --- Episode Title (removed duplicate position calculation) ---
         
         # Glow pulse effect - subtly varies glow intensity
         glow_cycle = (time_position / duration) * 2 * np.pi * 0.3  # Slow pulse (0.3 Hz)
@@ -621,25 +653,9 @@ class VideoGenerator:
         
         # Draw title in golden yellow (matching waveform colors)
         golden_yellow = (255, 245, 150)  # Bright golden matching the waveform
-        draw.text((episode_x, episode_y), episode_title, font=episode_font, fill=golden_yellow)
+        draw.text((episode_x, episode_y), clean_title, font=episode_font, fill=golden_yellow)
         
-        # --- Podcast Name ---
-        podcast_bbox = draw.textbbox((0, 0), self.podcast_name, font=podcast_font)
-        podcast_width = podcast_bbox[2] - podcast_bbox[0]
-        podcast_height = podcast_bbox[3] - podcast_bbox[1]
-        
-        # Centered horizontally
-        podcast_x = margin_x + (usable_width - podcast_width) // 2
-        
-        # Vertically centered in available bottom space if we have an image, otherwise use margin
-        if episode_image is not None:
-            # Position podcast name just above the bottom with minimal gap to image
-            title_to_image_gap = int(self.height * 0.005)  # 0.5% gap (~5px)
-            image_bottom_y = (self.height + episode_image.height) // 2
-            # Position title so its top edge is at the gap distance from the image bottom
-            podcast_y = image_bottom_y + title_to_image_gap
-        else:
-            podcast_y = self.height - int(self.height * 0.05) - podcast_height
+        # --- Podcast Name (removed duplicate position calculation) ---
         
         # Draw shadow/glow with pulsing intensity for podcast name
         for offset in [5, 4, 3]:
@@ -664,7 +680,18 @@ class VideoGenerator:
             alpha_array = (alpha_array * alpha_multiplier).astype(np.uint8)
             text_img.putalpha(Image.fromarray(alpha_array))
         
-        return text_img
+        # Return overlay and font cache for future frames
+        font_cache = {
+            'episode_font': episode_font,
+            'podcast_font': podcast_font,
+            'episode_x': episode_x,
+            'episode_y': episode_y,
+            'podcast_x': podcast_x,
+            'podcast_y': podcast_y,
+            'clean_title': clean_title
+        }
+        
+        return text_img, font_cache
     
     def animate_logo_scale(self, time_position, duration, base_scale=1.0, amplitude=0.05, frequency=0.5):
         """Create breathing animation for the logo."""
@@ -925,11 +952,15 @@ class VideoGenerator:
             if fullscreen_image:
                 print(f"📸 Thematic image transitions: {self.initial_composite_duration}s composite → {self.fullscreen_image_duration}s fullscreen (repeating)")
             
-            # Create a generator for final composited frames
+            # Create a generator for final composited frames  
+            font_cache = None  # Will be populated on first frame to avoid re-searching
+            
             def final_frame_generator():
+                nonlocal font_cache
                 frame_count = 0
                 total_frames = int(duration * self.fps)
                 last_percent = -1
+                font_cache = None  # Will be populated on first frame
                 
                 for waveform_frame, waveform_data in waveform_frame_generator:
                     time_position = frame_count / self.fps
@@ -941,7 +972,10 @@ class VideoGenerator:
                         last_percent = percent
                     
                     # Create text overlay dynamically for animations (fade-in, glow pulse)
-                    text_overlay = self.create_text_overlay(episode_title, episode_image, time_position, duration)
+                    # Pass cached fonts after first frame to avoid expensive binary search
+                    text_overlay, font_cache = self.create_text_overlay(
+                        episode_title, episode_image, time_position, duration, cached_fonts=font_cache
+                    )
                     
                     # Composite this frame with view state transitions
                     final_frame = self.composite_frame(

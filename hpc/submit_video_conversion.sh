@@ -14,7 +14,7 @@
 # Options:
 #   --single-file <path>     Specify exact file to convert
 #   --enhance-audio          Enable audio enhancement (EQ, normalisation, click removal)
-#   --time-limit HH:MM:SS    Maximum time per file (default: 4h)
+#   --time-limit HH:MM:SS    Maximum time per file (default: 8h)
 #   --memory <size>          Memory allocation (default: 32G)
 
 echo "🎙️  AUTO-SUBMIT VIDEO CONVERSION JOBS"
@@ -106,7 +106,7 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "HPC-specific options:"
             echo "  --single-file <path>       Specify exact file to convert"
-            echo "  --time-limit HH:MM:SS      Maximum time per file (default: 4h)"
+            echo "  --time-limit HH:MM:SS      Maximum time per file (default: 8h)"
             echo "  --memory <size>            Memory allocation (default: 32G)"
             echo ""
             echo "Video conversion options:"
@@ -412,7 +412,7 @@ fi
 
 # Set defaults
 if [ -z "$TIME_LIMIT" ]; then
-    TIME_LIMIT="04:00:00"
+    TIME_LIMIT="08:00:00"
 fi
 if [ -z "$MEMORY" ]; then
     MEMORY="32G"
