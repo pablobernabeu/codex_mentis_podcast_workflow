@@ -197,13 +197,13 @@ class VideoGenerator:
             frame = Image.new('RGBA', frame_size, (0, 0, 0, 0))
             frame_draw = ImageDraw.Draw(frame)
             
-            # Golden yellow gradient colors (from darker to lighter, matching waveform palette)
+            # Golden orange gradient colors (from darker to lighter, matching waveform palette)
             orange_colors = [
-                (255, 240, 100),   # Darker golden
-                (255, 240, 130),   # Medium golden
-                (255, 245, 160),   # Light golden
-                (255, 250, 180),   # Bright golden
-                (255, 255, 240)    # Brightest golden
+                (255, 200, 70),   # Darker golden orange
+                (255, 200, 80),   # Medium golden orange
+                (255, 210, 90),   # Light golden orange
+                (255, 220, 100),   # Bright orange
+                (255, 230, 120)    # Brightest orange
             ]
             
             # Draw gradient as concentric filled rectangles (from outside to inside)
@@ -224,7 +224,7 @@ class VideoGenerator:
             glow_draw = ImageDraw.Draw(glow)
             glow_draw.rectangle(
                 [10, 10, frame_size[0] + 30, frame_size[1] + 30],
-                fill=(255, 240, 100, 60)  # Semi-transparent golden yellow glow
+                fill=(255, 200, 70, 60)  # Semi-transparent golden orange glow
             )
             glow = glow.filter(ImageFilter.GaussianBlur(radius=15))
             
@@ -270,8 +270,8 @@ class VideoGenerator:
         draw = ImageDraw.Draw(light_overlay)
         
         # Calculate light position around the frame perimeter
-        # Complete one full circle every 4 seconds
-        cycle_duration = 4.0
+        # Complete one full cycle every 12 seconds (slower for subtle effect)
+        cycle_duration = 12.0
         progress = (time_position % cycle_duration) / cycle_duration
         
         # Frame dimensions (from load_and_prepare_episode_image)
@@ -319,7 +319,7 @@ class VideoGenerator:
         
         # Draw the shiny light effect - smaller and more focused on the frame
         light_color = (255, 255, 255)  # Pure white
-        golden_color = (255, 250, 200)  # Soft golden
+        golden_color = (255, 220, 100)  # Soft golden orange
         
         # Draw multiple concentric circles for smooth glow effect (smaller to fit the frame)
         # Keep the glow within the frame width
@@ -415,6 +415,7 @@ class VideoGenerator:
             podcast_x = cached_fonts['podcast_x']
             podcast_y = cached_fonts['podcast_y']
             clean_title = cached_fonts['clean_title']
+            print(f"  ♻️ Using cached fonts")
         else:
             # First-time calculation - run binary search for optimal font sizes
             # Calculate available vertical space based on whether we have an episode image
@@ -424,10 +425,10 @@ class VideoGenerator:
                 image_top_y = (self.height - image_height) // 2
                 image_bottom_y = image_top_y + image_height
                 
-                # Available space for titles (with small padding from image)
-                vertical_padding = int(self.height * 0.005)  # 0.5% padding from image (minimal margin)
-                available_top_space = image_top_y - vertical_padding
-                available_bottom_space = self.height - image_bottom_y - vertical_padding
+                # Available space for titles - account for the gap we'll add during positioning
+                title_to_image_gap = int(self.height * 0.038)  # Gap between title and image
+                available_top_space = image_top_y - title_to_image_gap
+                available_bottom_space = self.height - image_bottom_y
             else:
                 # No image - use percentage-based spacing
                 available_top_space = int(self.height * 0.4)
@@ -448,8 +449,8 @@ class VideoGenerator:
             
             # --- Dynamically size episode title to fill available top space ---
             # Use binary search to find the largest font that fits
-            min_title_font_size = 30
-            max_title_font_size = int(available_top_space * 1.2)  # Start based on available space
+            min_title_font_size = 40
+            max_title_font_size = max(int(available_top_space * 2.5), 150)  # Moderate sizing
             title_font_size = max_title_font_size
             best_title_font_size = min_title_font_size
             episode_font = None
@@ -489,8 +490,8 @@ class VideoGenerator:
                 episode_width = episode_bbox[2] - episode_bbox[0]
                 episode_height = episode_bbox[3] - episode_bbox[1]
                 
-                # Check if it fits within both width and available vertical space
-                if episode_width <= usable_width * 0.98 and episode_height <= available_top_space * 0.95:
+                # Check if it fits within screen bounds
+                if episode_width <= self.width * 0.95 and episode_height <= available_top_space * 0.9:
                     # Fits! Try larger
                     best_title_font_size = title_font_size
                     episode_font = test_font
@@ -503,6 +504,7 @@ class VideoGenerator:
             title_font_size = best_title_font_size
             if episode_font is None:
                 # Load final font with best size
+                font_loaded = False
                 for font_name in [
                     "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",  # Linux
                     "/System/Library/Fonts/Supplemental/Times New Roman.ttf",  # macOS
@@ -512,18 +514,24 @@ class VideoGenerator:
                 ]:
                     try:
                         episode_font = ImageFont.truetype(font_name, title_font_size)
+                        print(f"  ✓ Episode font loaded: {font_name} @ {title_font_size}px")
+                        font_loaded = True
                         break
                     except:
                         continue
                 if episode_font is None:
+                    print(f"  ⚠️ Warning: Using default font for episode title (TrueType fonts not found)")
                     episode_font = ImageFont.load_default()
+            else:
+                # Font was loaded successfully during binary search
+                print(f"  ✓ Episode title font loaded successfully @ {title_font_size}px")
             
             print(f"  📏 Episode title font size: {title_font_size}px (available space: {available_top_space}px)")
             
             # --- Dynamically size podcast name to fill available bottom space ---
             # Use binary search to find the largest font that fits
-            min_podcast_font_size = 20
-            max_podcast_font_size = int(available_bottom_space * 1.0)
+            min_podcast_font_size = 40
+            max_podcast_font_size = max(int(available_bottom_space * 2.5), 150)  # Moderate sizing
             podcast_font_size = max_podcast_font_size
             best_podcast_font_size = min_podcast_font_size
             podcast_font = None
@@ -556,8 +564,8 @@ class VideoGenerator:
                 podcast_width = podcast_bbox[2] - podcast_bbox[0]
                 podcast_height = podcast_bbox[3] - podcast_bbox[1]
                 
-                # Check if it fits within both width and available vertical space
-                if podcast_width <= usable_width * 0.98 and podcast_height <= available_bottom_space * 0.95:
+                # Check if it fits within screen bounds
+                if podcast_width <= self.width * 0.95 and podcast_height <= available_bottom_space * 0.9:
                     # Fits! Try larger
                     best_podcast_font_size = podcast_font_size
                     podcast_font = test_font
@@ -570,6 +578,7 @@ class VideoGenerator:
             podcast_font_size = best_podcast_font_size
             if podcast_font is None:
                 # Load final font with best size
+                font_loaded = False
                 for font_name in [
                     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux
                     "/System/Library/Fonts/Supplemental/Arial.ttf",  # macOS
@@ -579,11 +588,17 @@ class VideoGenerator:
                 ]:
                     try:
                         podcast_font = ImageFont.truetype(font_name, podcast_font_size)
+                        print(f"  ✓ Podcast font loaded: {font_name} @ {podcast_font_size}px")
+                        font_loaded = True
                         break
                     except:
                         continue
                 if podcast_font is None:
+                    print(f"  ⚠️ Warning: Using default font for podcast name (TrueType fonts not found)")
                     podcast_font = ImageFont.load_default()
+            else:
+                # Font was loaded successfully during binary search
+                print(f"  ✓ Podcast name font loaded successfully @ {podcast_font_size}px")
             
             print(f"  📏 Podcast name font size: {podcast_font_size}px (available space: {available_bottom_space}px)")
             
@@ -617,11 +632,14 @@ class VideoGenerator:
             
             # Vertically centered in available bottom space if we have an image, otherwise use margin
             if episode_image is not None:
-                # Position podcast name just above the bottom with minimal gap to image
-                title_to_image_gap = int(self.height * 0.005)  # Minimal gap
+                # Center podcast name vertically between image bottom and screen bottom
+                # Note: episode_image includes 20px glow + 12px frame at bottom
                 image_bottom_y = (self.height + episode_image.height) // 2
-                # Position title so its top edge is at the gap distance from the image bottom
-                podcast_y = image_bottom_y + title_to_image_gap
+                visual_image_bottom = image_bottom_y - 32  # Account for glow (20px) + frame (12px)
+                # Find the midpoint between visual image bottom and screen bottom
+                midpoint = (visual_image_bottom + self.height) // 2
+                # Center the text at this midpoint
+                podcast_y = midpoint - podcast_height // 2
             else:
                 podcast_y = self.height - int(self.height * 0.05) - podcast_height
         
@@ -651,8 +669,8 @@ class VideoGenerator:
                 fill=(0, 0, 0, min(255, max(0, glow_layer_alpha)))
             )
         
-        # Draw title in golden yellow (matching waveform colors)
-        golden_yellow = (255, 245, 150)  # Bright golden matching the waveform
+        # Draw title in golden orange (matching waveform colors)
+        golden_yellow = (255, 210, 90)  # Bright golden orange matching the waveform
         draw.text((episode_x, episode_y), clean_title, font=episode_font, fill=golden_yellow)
         
         # --- Podcast Name (removed duplicate position calculation) ---

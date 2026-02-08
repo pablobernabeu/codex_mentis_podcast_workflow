@@ -209,7 +209,9 @@ get_episode_title() {
     local suggested="$basename"
     # Replace underscores with colons for title format
     if [[ "$suggested" == *"_"* ]]; then
-        suggested="${suggested/_/: }"
+        suggested="${suggested//_/:}"
+        # Normalize multiple spaces to single space
+        suggested=$(echo "$suggested" | sed 's/  \+/ /g')
     fi
     
     echo ""
@@ -369,7 +371,9 @@ else
             # Generate suggested title from filename
             suggested="$basename"
             if [[ "$suggested" == *"_"* ]]; then
-                suggested="${suggested/_/: }"
+                suggested="${suggested//_/:}"
+                # Normalize multiple spaces to single space
+                suggested=$(echo "$suggested" | sed 's/  \+/ /g')
             fi
             
             echo "[$num/${#SELECTED_FILES[@]}] $filename"

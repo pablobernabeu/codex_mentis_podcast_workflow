@@ -18,19 +18,19 @@ class WaveformVisualizer:
         self.height = height
         self.fps = 30
         
-        # Bright yellow/golden brainwave color palette (RGB values)
+        # Bright orange/golden brainwave color palette (RGB values)
         self.colors = {
             'background': (20, 25, 35),      # Dark blue-gray background
-            'waveform_light': (255, 255, 180),  # Bright yellow-white
-            'waveform_mid': (255, 240, 120),    # Golden yellow
-            'waveform_dark': (255, 220, 80),    # Deep golden
+            'waveform_light': (255, 220, 100),  # Bright orange-white
+            'waveform_mid': (255, 200, 80),    # Golden orange
+            'waveform_dark': (255, 180, 60),    # Deep orange
             'text': (240, 235, 220),            # Light beige for text
-            'accent': (255, 240, 100)           # Intense golden accent
+            'accent': (255, 200, 70)           # Intense orange accent
         }
         
         # Waveform parameters - configured for dramatic brainwave appearance like reference image
         self.waveform_center_y = height // 2  # Center line aligned with logo center
-        self.waveform_amplitude = 450  # High amplitude for spikes
+        self.waveform_amplitude = 650  # High amplitude for spikes
         self.waveform_area_height = 900  # Tall area to allow full spike range
         self.waveform_line_thickness = 1  # Ultra-thin line for sharp, precise brainwave look
         
@@ -130,23 +130,23 @@ class WaveformVisualizer:
             else:
                 thickness = 1  # Core is ultra-thin
             
-            # Bright yellow/golden colors
-            if pass_idx == 0:  # Outermost glow - pure bright white-yellow
-                color = [255, 255, 240]
-            elif pass_idx == 1:  # Second glow - bright yellow
-                color = [255, 255, 220]
-            elif pass_idx == 2:  # Third layer - bright lemon yellow
-                color = [255, 255, 200]
-            elif pass_idx == 3:  # Fourth layer - golden yellow
-                color = [255, 250, 180]
+            # Bright orange/golden colors
+            if pass_idx == 0:  # Outermost glow - pure bright white-orange
+                color = [255, 220, 100]
+            elif pass_idx == 1:  # Second glow - bright orange
+                color = [255, 210, 90]
+            elif pass_idx == 2:  # Third layer - bright lemon orange
+                color = [255, 200, 80]
+            elif pass_idx == 3:  # Fourth layer - golden orange
+                color = [255, 190, 75]
             elif pass_idx == 4:  # Fifth layer - pure golden
-                color = [255, 240, 150]
+                color = [255, 185, 70]
             elif pass_idx == 5:  # Sixth layer - deep golden
-                color = [255, 235, 130]
+                color = [255, 180, 65]
             elif pass_idx == 6:  # Inner core - intense golden
-                color = [255, 230, 110]
+                color = [255, 175, 60]
             else:  # Ultimate core - brightest golden accent
-                color = [255, 240, 100]
+                color = [255, 200, 70]
             
             # Draw line segments with full opacity
             for i in range(len(points) - 1):
@@ -157,15 +157,15 @@ class WaveformVisualizer:
                 
                 cv2.line(frame, points[i], points[i + 1], adjusted_color, thickness)
         
-        # Glow effect on spikes for brainwave appearance
-        for i, (point, amp) in enumerate(zip(points, amplitude_data)):
-            if abs(amp) > 0.03:  # Lower threshold for more glow points
-                glow_intensity = min(255, int(255 * abs(amp) * 2.0))
-                # Bright yellow-white glow
-                glow_color = [255, 255, min(255, 180 + glow_intensity // 2)] + [255]  # Full opacity
-                # Larger glow circles for spikes
-                glow_size = 10 if abs(amp) > 0.1 else 6
-                cv2.circle(frame, point, glow_size, glow_color, -1)
+        # Bubble effects disabled per user request
+        # for i, (point, amp) in enumerate(zip(points, amplitude_data)):
+        #     if abs(amp) > 0.03:  # Lower threshold for more glow points
+        #         glow_intensity = min(255, int(255 * abs(amp) * 2.0))
+        #         # Bright yellow-white glow
+        #         glow_color = [255, 255, min(255, 180 + glow_intensity // 2)] + [255]  # Full opacity
+        #         # Larger glow circles for spikes
+        #         glow_size = 10 if abs(amp) > 0.1 else 6
+        #         cv2.circle(frame, point, glow_size, glow_color, -1)
     
     def add_progress_bar(self, frame, time_position, total_duration):
         """Add a subtle progress bar at the bottom."""

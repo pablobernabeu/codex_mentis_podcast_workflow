@@ -51,8 +51,8 @@ class PodcastVideoConverter:
         # Ensure directories exist
         self.ensure_directories()
         
-        # Load episode titles
-        self.episode_titles = self.load_episode_titles()
+        # Episode titles (no caching)
+        self.episode_titles = {}
     
     def ensure_directories(self):
         """Create necessary directories if they don't exist."""
@@ -86,6 +86,26 @@ class PodcastVideoConverter:
                 audio_files.append(file_path)
         return sorted(audio_files)
     
+    def generate_title_from_filename(self, filename):
+        """Generate a clean title from a filename.
+        
+        Args:
+            filename: The file stem (without extension)
+            
+        Returns:
+            A cleaned title string
+        """
+        import re
+        clean_filename = filename
+        if clean_filename.lower().startswith('episode: '):
+            clean_filename = clean_filename[9:]
+        
+        # Replace underscore with colon
+        clean_filename = clean_filename.replace('_', ':')
+        # Normalize any multiple spaces to single space
+        clean_filename = re.sub(r'  +', ' ', clean_filename)
+        return clean_filename
+    
     def collect_all_episode_titles(self, selected_files):
         """Collect episode titles for all selected files upfront."""
         print(f"\n📝 Setting up episode titles for {len(selected_files)} file(s)")
@@ -98,22 +118,8 @@ class PodcastVideoConverter:
         for i, wav_file_path in enumerate(selected_files, 1):
             filename = wav_file_path.stem
             
-            # Check if we already have a title for this file
-            if filename in self.episode_titles:
-                print(f"[{i}/{len(selected_files)}] {filename}")
-                print(f"   ✓ Using saved title: '{self.episode_titles[filename]}'")
-                continue
-            
             # Generate suggested title
-            clean_filename = filename
-            if clean_filename.lower().startswith('episode: '):
-                clean_filename = clean_filename[9:]
-            
-            if '_' in clean_filename:
-                parts = clean_filename.split('_', 1)
-                suggested_title = f"{parts[0].strip()}: {parts[1].strip()}"
-            else:
-                suggested_title = clean_filename
+            suggested_title = self.generate_title_from_filename(filename)
             
             # Prompt for title
             print(f"[{i}/{len(selected_files)}] {filename}")
@@ -125,9 +131,7 @@ class PodcastVideoConverter:
             print(f"   ✓ Set title: '{episode_title}'")
             print()
         
-        # Save all titles
-        self.save_episode_titles()
-        print("✅ All episode titles collected and saved!")
+        print("✅ All episode titles collected!")
         return True
     
     def select_files_to_process(self, audio_files):
@@ -369,24 +373,11 @@ class PodcastVideoConverter:
         for audio_file in selected_files:
             filename = audio_file.stem
             if filename not in self.episode_titles:
-                # Auto-generate title from filename
-                clean_filename = filename
-                if clean_filename.lower().startswith('episode: '):
-                    clean_filename = clean_filename[9:]
-                
-                if '_' in clean_filename:
-                    parts = clean_filename.split('_', 1)
-                    auto_title = f"{parts[0].strip()}: {parts[1].strip()}"
-                else:
-                    auto_title = clean_filename
-                
+                auto_title = self.generate_title_from_filename(filename)
                 self.episode_titles[filename] = auto_title
                 print(f"   ✓ Auto-generated title for '{filename}': '{auto_title}'")
             else:
-                print(f"   ✓ Using saved title for '{filename}': '{self.episode_titles[filename]}'")
-        
-        # Save titles
-        self.save_episode_titles()
+                print(f"   ✓ Using title for '{filename}': '{self.episode_titles[filename]}'")
         
         # Process files
         print(f"\n🎯 Processing {len(selected_files)} file(s)...")
