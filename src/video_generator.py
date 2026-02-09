@@ -10,7 +10,6 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import cv2
 from waveform_visualizer import WaveformVisualizer
 
-# Diagnostic: Print where this code is loaded from (helps verify no caching issues)
 print(f"[DIAGNOSTIC] video_generator.py loaded from: {__file__}")
 
 
@@ -37,8 +36,8 @@ class VideoGenerator:
             'waveform_dark': (180, 140, 100),
             'text': (240, 235, 220),
             'accent': (255, 200, 120),
-            'text_bg': (0, 0, 0, 120),  # Semi-transparent background
-            'podcast': (180, 190, 200)  # Cool silver-grey for podcast name
+            'text_bg': (0, 0, 0, 120),
+            'podcast': (180, 190, 200)
         }
     
     def get_view_state(self, time_position, duration):
@@ -58,14 +57,8 @@ class VideoGenerator:
         # Check if we're in the final composite period
         time_remaining = duration - time_position
         if time_remaining <= final_composite_duration:
-            # Last 30 seconds - always show composite
+            # Last minute - always show composite
             return ('composite', None)
-        
-        # Check if we need to zoom out to prepare for final composite
-        if time_remaining <= final_composite_duration + self.zoom_transition_duration:
-            # Zoom out transition to final composite
-            progress = (final_composite_duration + self.zoom_transition_duration - time_remaining) / self.zoom_transition_duration
-            return ('zoom_out', progress)
         
         cycle_duration = self.fullscreen_image_duration + self.composite_interval_duration
         
@@ -99,6 +92,8 @@ class VideoGenerator:
         else:
             # Zoom-in transition
             progress = (time_in_cycle - (self.fullscreen_image_duration + self.composite_interval_duration - self.zoom_transition_duration)) / self.zoom_transition_duration
+            if time_remaining <= final_composite_duration + self.zoom_transition_duration:
+                return ('composite', None)
             return ('zoom_in', progress)
     
     def load_and_prepare_logo(self, logo_path):
@@ -112,11 +107,9 @@ class VideoGenerator:
             # Load logo
             logo = Image.open(logo_path)
             
-            # Convert to RGBA if not already
             if logo.mode != 'RGBA':
                 logo = logo.convert('RGBA')
             
-            # Resize logo to fit nicely (max 400x400 pixels)
             logo.thumbnail((400, 400), Image.Resampling.LANCZOS)
             
             # Create a circular mask for the logo
@@ -189,31 +182,24 @@ class VideoGenerator:
             # Resize image maintaining aspect ratio
             img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
             
-            # Create golden yellow gradient frame (matching waveform)
-            frame_width = 12  # Frame thickness
+            frame_width = 12
             frame_size = (target_width + frame_width * 2, target_height + frame_width * 2)
-            
-            # Create gradient frame with golden yellow tones matching the waveform
             frame = Image.new('RGBA', frame_size, (0, 0, 0, 0))
             frame_draw = ImageDraw.Draw(frame)
             
-            # Golden orange gradient colors (from darker to lighter, matching waveform palette)
             orange_colors = [
-                (255, 200, 70),   # Darker golden orange
-                (255, 200, 80),   # Medium golden orange
-                (255, 210, 90),   # Light golden orange
-                (255, 220, 100),   # Bright orange
-                (255, 230, 120)    # Brightest orange
+                (255, 220, 90),   # Darker yellow
+                (255, 230, 100),  # Medium yellow
+                (255, 235, 105),  # Light yellow
+                (255, 240, 110),  # Bright yellow
+                (255, 245, 115)
             ]
             
-            # Draw gradient as concentric filled rectangles (from outside to inside)
             num_layers = len(orange_colors)
             layer_thickness = frame_width / num_layers
             
             for i, color in enumerate(orange_colors):
-                # Calculate the inset for this layer
                 inset = int(i * layer_thickness)
-                # Draw filled rectangle for this layer
                 frame_draw.rectangle(
                     [inset, inset, frame_size[0] - inset - 1, frame_size[1] - inset - 1],
                     fill=color
@@ -224,7 +210,7 @@ class VideoGenerator:
             glow_draw = ImageDraw.Draw(glow)
             glow_draw.rectangle(
                 [10, 10, frame_size[0] + 30, frame_size[1] + 30],
-                fill=(255, 200, 70, 60)  # Semi-transparent golden orange glow
+                fill=(255, 230, 100, 60)  # Semi-transparent bright yellow glow
             )
             glow = glow.filter(ImageFilter.GaussianBlur(radius=15))
             
@@ -265,64 +251,43 @@ class VideoGenerator:
         if image is None:
             return None
         
-        # Create an overlay for the light effect
         light_overlay = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(light_overlay)
         
-        # Calculate light position around the frame perimeter
-        # Complete one full cycle every 12 seconds (slower for subtle effect)
-        cycle_duration = 12.0
+        cycle_duration = 24.0
         progress = (time_position % cycle_duration) / cycle_duration
         
-        # Frame dimensions (from load_and_prepare_episode_image)
-        glow_offset = 20  # Outer glow offset
-        frame_width = 12  # Frame thickness
-        frame_center_offset = glow_offset + frame_width // 2  # Center of the frame
+        glow_offset = 20
+        frame_width = 12
+        frame_center_offset = glow_offset + frame_width // 2
         
         # Get the total framed image dimensions
         img_width = image.width
         img_height = image.height
         
-        # Calculate the actual frame rectangle (centered in the border)
-        # Frame spans from offset 20 to offset 32, so center is at 26
-        frame_rect_width = img_width - 2 * frame_center_offset  # Inner perimeter width
-        frame_rect_height = img_height - 2 * frame_center_offset  # Inner perimeter height
+        frame_rect_width = img_width - 2 * frame_center_offset
+        frame_rect_height = img_height - 2 * frame_center_offset
         
-        # Calculate the perimeter path along the center of the frame
         perimeter = 2 * (frame_rect_width + frame_rect_height)
-        
-        # Start at middle of right side (where waveform touches the frame)
-        # Right side starts at frame_rect_width, middle is at +frame_rect_height/2
         starting_offset = frame_rect_width + frame_rect_height / 2
         
-        # Current position along the perimeter, starting from middle-right
         current_pos = (progress * perimeter + starting_offset) % perimeter
         
-        # Determine which side of the frame and position along that side
-        # Starting from middle-right, going clockwise: right (down) -> bottom -> left -> top -> right (up to middle)
         if current_pos < frame_rect_width:
-            # Top edge: moving right along the center of the top frame
             light_x = episode_x + frame_center_offset + current_pos
             light_y = episode_y + frame_center_offset
         elif current_pos < frame_rect_width + frame_rect_height:
-            # Right edge: moving down along the center of the right frame
             light_x = episode_x + img_width - frame_center_offset
             light_y = episode_y + frame_center_offset + (current_pos - frame_rect_width)
         elif current_pos < 2 * frame_rect_width + frame_rect_height:
-            # Bottom edge: moving left along the center of the bottom frame
             light_x = episode_x + img_width - frame_center_offset - (current_pos - frame_rect_width - frame_rect_height)
             light_y = episode_y + img_height - frame_center_offset
         else:
-            # Left edge: moving up along the center of the left frame
             light_x = episode_x + frame_center_offset
             light_y = episode_y + img_height - frame_center_offset - (current_pos - 2 * frame_rect_width - frame_rect_height)
         
-        # Draw the shiny light effect - smaller and more focused on the frame
-        light_color = (255, 255, 255)  # Pure white
-        golden_color = (255, 220, 100)  # Soft golden orange
-        
-        # Draw multiple concentric circles for smooth glow effect (smaller to fit the frame)
-        # Keep the glow within the frame width
+        light_color = (255, 255, 255)
+        golden_color = (255, 235, 110)
         draw.ellipse(
             [light_x - 20, light_y - 20, light_x + 20, light_y + 20],
             fill=golden_color + (20,)  # Outer glow
@@ -337,7 +302,7 @@ class VideoGenerator:
         )
         draw.ellipse(
             [light_x - 5, light_y - 5, light_x + 5, light_y + 5],
-            fill=light_color + (100,)  # Brighter center
+            fill=light_color + (100,)
         )
         draw.ellipse(
             [light_x - 2, light_y - 2, light_x + 2, light_y + 2],
@@ -462,7 +427,9 @@ class VideoGenerator:
                 
                 # Try to load TrueType font (cross-platform compatible)
                 test_font = None
+                home_fonts = os.path.expanduser("~/.fonts/DejaVuSerif.ttf")  # User-installed fonts
                 for font_name in [
+                    home_fonts,  # User's font directory (HPC)
                     "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",  # Linux
                     "/usr/share/fonts/dejavu/DejaVuSerif.ttf",  # Alternative Linux path
                     "/System/Library/Fonts/Supplemental/Times New Roman.ttf",  # macOS
@@ -482,6 +449,7 @@ class VideoGenerator:
                     if not font_loaded_successfully:
                         print(f"  ⚠️ No TrueType fonts available (tried Linux/Mac/Windows paths)")
                         print(f"     Using PIL ImageDraw text rendering with size {title_font_size}")
+                        print(f"     ⚠️⚠️⚠️ WARNING: Default font ignores size - text will be tiny!")
                     # Use PIL text drawing instead - create a font-like object
                     test_font = ImageFont.load_default()
                     # For default font, we'll use text drawing directly later
@@ -503,9 +471,10 @@ class VideoGenerator:
             # Use the best size we found
             title_font_size = best_title_font_size
             if episode_font is None:
-                # Load final font with best size
                 font_loaded = False
+                home_fonts = os.path.expanduser("~/.fonts/DejaVuSerif.ttf")
                 for font_name in [
+                    home_fonts,  # User's font directory (HPC)
                     "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",  # Linux
                     "/System/Library/Fonts/Supplemental/Times New Roman.ttf",  # macOS
                     "C:\\Windows\\Fonts\\times.ttf",  # Windows
@@ -520,29 +489,30 @@ class VideoGenerator:
                     except:
                         continue
                 if episode_font is None:
-                    print(f"  ⚠️ Warning: Using default font for episode title (TrueType fonts not found)")
+                    print(f"  ⚠️⚠️⚠️ CRITICAL: Using default font for episode title (TrueType fonts not found)")
+                    print(f"  ⚠️⚠️⚠️ TEXT WILL BE TINY! Install DejaVu fonts or liberation-fonts on HPC")
                     episode_font = ImageFont.load_default()
             else:
-                # Font was loaded successfully during binary search
                 print(f"  ✓ Episode title font loaded successfully @ {title_font_size}px")
+                # Verify it's not the default font
+                if hasattr(episode_font, 'path'):
+                    print(f"  ✓ Using TrueType font: {episode_font.path}")
             
             print(f"  📏 Episode title font size: {title_font_size}px (available space: {available_top_space}px)")
             
-            # --- Dynamically size podcast name to fill available bottom space ---
-            # Use binary search to find the largest font that fits
             min_podcast_font_size = 40
-            max_podcast_font_size = max(int(available_bottom_space * 2.5), 150)  # Moderate sizing
+            max_podcast_font_size = max(int(available_bottom_space * 2.5), 150)
             podcast_font_size = max_podcast_font_size
             best_podcast_font_size = min_podcast_font_size
             podcast_font = None
             
-            # Binary search for optimal font size
             while max_podcast_font_size - min_podcast_font_size > 2:
                 podcast_font_size = (min_podcast_font_size + max_podcast_font_size) // 2
                 
-                # Try to load TrueType font (cross-platform compatible)
                 test_font = None
+                home_fonts_sans = os.path.expanduser("~/.fonts/DejaVuSans.ttf")
                 for font_name in [
+                    home_fonts_sans,  # User's font directory (HPC)
                     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux
                     "/usr/share/fonts/dejavu/DejaVuSans.ttf",  # Alternative Linux path
                     "/System/Library/Fonts/Supplemental/Arial.ttf",  # macOS
@@ -557,29 +527,25 @@ class VideoGenerator:
                         continue
                 
                 if test_font is None:
-                    # Use PIL default rendering
                     test_font = ImageFont.load_default()
                 
                 podcast_bbox = temp_draw.textbbox((0, 0), self.podcast_name, font=test_font)
                 podcast_width = podcast_bbox[2] - podcast_bbox[0]
                 podcast_height = podcast_bbox[3] - podcast_bbox[1]
                 
-                # Check if it fits within screen bounds
                 if podcast_width <= self.width * 0.95 and podcast_height <= available_bottom_space * 0.9:
-                    # Fits! Try larger
                     best_podcast_font_size = podcast_font_size
                     podcast_font = test_font
                     min_podcast_font_size = podcast_font_size
                 else:
-                    # Too big, try smaller
                     max_podcast_font_size = podcast_font_size
             
-            # Use the best size we found
             podcast_font_size = best_podcast_font_size
             if podcast_font is None:
-                # Load final font with best size
                 font_loaded = False
+                home_fonts_sans = os.path.expanduser("~/.fonts/DejaVuSans.ttf")
                 for font_name in [
+                    home_fonts_sans,  # User's font directory (HPC)
                     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux
                     "/System/Library/Fonts/Supplemental/Arial.ttf",  # macOS
                     "C:\\Windows\\Fonts\\arial.ttf",  # Windows
@@ -594,11 +560,14 @@ class VideoGenerator:
                     except:
                         continue
                 if podcast_font is None:
-                    print(f"  ⚠️ Warning: Using default font for podcast name (TrueType fonts not found)")
+                    print(f"  ⚠️⚠️⚠️ CRITICAL: Using default font for podcast name (TrueType fonts not found)")
+                    print(f"  ⚠️⚠️⚠️ TEXT WILL BE TINY! Install DejaVu fonts or liberation-fonts on HPC")
                     podcast_font = ImageFont.load_default()
             else:
-                # Font was loaded successfully during binary search
                 print(f"  ✓ Podcast name font loaded successfully @ {podcast_font_size}px")
+                # Verify it's not the default font
+                if hasattr(podcast_font, 'path'):
+                    print(f"  ✓ Using TrueType font: {podcast_font.path}")
             
             print(f"  📏 Podcast name font size: {podcast_font_size}px (available space: {available_bottom_space}px)")
             
@@ -632,34 +601,22 @@ class VideoGenerator:
             
             # Vertically centered in available bottom space if we have an image, otherwise use margin
             if episode_image is not None:
-                # Center podcast name vertically between image bottom and screen bottom
-                # Note: episode_image includes 20px glow + 12px frame at bottom
                 image_bottom_y = (self.height + episode_image.height) // 2
-                visual_image_bottom = image_bottom_y - 32  # Account for glow (20px) + frame (12px)
-                # Find the midpoint between visual image bottom and screen bottom
+                visual_image_bottom = image_bottom_y - 32
                 midpoint = (visual_image_bottom + self.height) // 2
-                # Center the text at this midpoint
                 podcast_y = midpoint - podcast_height // 2
             else:
                 podcast_y = self.height - int(self.height * 0.05) - podcast_height
         
-        # Only build the text image with the cached/computed fonts
-        # Create transparent image for text overlays
         text_img = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(text_img)
         
-        # --- Episode Title (removed duplicate position calculation) ---
+        if not hasattr(self, '_logged_text_size'):
+            print(f"  📐 Text overlay size: {text_img.size} (should be {self.width}x{self.height})")
+            self._logged_text_size = True
         
-        # Glow pulse effect - subtly varies glow intensity
-        glow_cycle = (time_position / duration) * 2 * np.pi * 0.3  # Slow pulse (0.3 Hz)
-        glow_intensity = 1.0 + 0.4 * np.sin(glow_cycle)  # Varies between 0.6 and 1.4
+        glow_alpha = 100
         
-        # Draw shadow/glow with pulsing intensity
-        shadow_offset = 3
-        glow_alpha = int(100 * glow_intensity)  # Base 100, varies 60-140
-        shadow_color = (0, 0, 0, min(255, max(0, glow_alpha)))
-        
-        # Multiple shadow layers for glow effect
         for offset in [5, 4, 3]:
             glow_layer_alpha = int(glow_alpha * (offset / 5.0) * 0.4)
             draw.text(
@@ -669,13 +626,10 @@ class VideoGenerator:
                 fill=(0, 0, 0, min(255, max(0, glow_layer_alpha)))
             )
         
-        # Draw title in golden orange (matching waveform colors)
-        golden_yellow = (255, 210, 90)  # Bright golden orange matching the waveform
+        golden_yellow = (255, 235, 100)
         draw.text((episode_x, episode_y), clean_title, font=episode_font, fill=golden_yellow)
         
-        # --- Podcast Name (removed duplicate position calculation) ---
-        
-        # Draw shadow/glow with pulsing intensity for podcast name
+
         for offset in [5, 4, 3]:
             glow_layer_alpha = int(glow_alpha * (offset / 5.0) * 0.4)
             draw.text(
@@ -688,9 +642,9 @@ class VideoGenerator:
         # Draw podcast name in distinct color
         draw.text((podcast_x, podcast_y), self.podcast_name, font=podcast_font, fill=self.colors['podcast'])
         
-        # Title fade-in effect (first 2 seconds)
+        # Title fade-in effect (first 2 seconds) - only applied when time_position > 0
         fade_duration = 2.0
-        if time_position < fade_duration:
+        if time_position < fade_duration and time_position > 0:
             alpha_multiplier = time_position / fade_duration  # 0.0 to 1.0
             # Apply fade by modulating alpha channel
             alpha_channel = text_img.split()[3]  # Get alpha channel
@@ -790,12 +744,8 @@ class VideoGenerator:
         
         # Add logo first (underneath everything)
         if logo is not None:
-            # Calculate logo position - integrated with waveform
-            logo_scale = self.animate_logo_scale(time_position, duration)
-            
-            # Resize logo based on animation
-            animated_size = (int(logo.width * logo_scale), int(logo.height * logo_scale))
-            animated_logo = logo.resize(animated_size, Image.Resampling.LANCZOS)
+            # Logo at original size (no animation for performance)
+            animated_logo = logo
             
             # Position logo on left side, integrated with waveform area
             base_logo_x = 30  # Left margin (moved further left)
@@ -969,6 +919,7 @@ class VideoGenerator:
             print(f"🎨 Creating video frames on-demand (Duration: {duration:.1f}s)...")
             if fullscreen_image:
                 print(f"📸 Thematic image transitions: {self.initial_composite_duration}s composite → {self.fullscreen_image_duration}s fullscreen (repeating)")
+            print("⚡ Performance optimizations: Static text (no glow pulse), static logo (no breathing)")
             
             # Create a generator for final composited frames  
             font_cache = None  # Will be populated on first frame to avoid re-searching
@@ -979,6 +930,9 @@ class VideoGenerator:
                 total_frames = int(duration * self.fps)
                 last_percent = -1
                 font_cache = None  # Will be populated on first frame
+                static_text_overlay = None  # Cache for static text (performance optimization)
+                fade_duration = 2.0
+                fade_frames = int(fade_duration * self.fps)
                 
                 for waveform_frame, waveform_data in waveform_frame_generator:
                     time_position = frame_count / self.fps
@@ -989,11 +943,24 @@ class VideoGenerator:
                         print(f"  Progress: {percent}% ({frame_count}/{total_frames} frames, {time_position:.1f}/{duration:.1f}s)")
                         last_percent = percent
                     
-                    # Create text overlay dynamically for animations (fade-in, glow pulse)
-                    # Pass cached fonts after first frame to avoid expensive binary search
-                    text_overlay, font_cache = self.create_text_overlay(
-                        episode_title, episode_image, time_position, duration, cached_fonts=font_cache
-                    )
+                    # Create text overlay: render once, then reuse (except during fade-in)
+                    if static_text_overlay is None:
+                        # Render the static text overlay once at full opacity
+                        print(f"  🎨 Creating static text overlay (fonts will be calculated once)")
+                        static_text_overlay, font_cache = self.create_text_overlay(
+                            episode_title, episode_image, fade_duration, duration, cached_fonts=font_cache
+                        )
+                        print(f"  ✓ Static text overlay created and cached for reuse")
+                    
+                    # Apply fade-in effect for first 2 seconds, then reuse static overlay
+                    if frame_count < fade_frames:
+                        # During fade-in: create text with fade applied
+                        text_overlay, _ = self.create_text_overlay(
+                            episode_title, episode_image, time_position, duration, cached_fonts=font_cache
+                        )
+                    else:
+                        # After fade-in: reuse static overlay (major performance gain)
+                        text_overlay = static_text_overlay
                     
                     # Composite this frame with view state transitions
                     final_frame = self.composite_frame(
@@ -1049,6 +1016,8 @@ class VideoGenerator:
                     return make_frame.frame_cache.get(last_available, np.zeros((self.height, self.width, 3), dtype=np.uint8))
             
             video_clip = VideoClip(make_frame, duration=duration)
+            # Explicitly set video size to prevent scaling issues
+            video_clip.size = (self.width, self.height)
             
             # Combine video and audio (compatible with moviepy 1.x and 2.x)
             if hasattr(video_clip, 'set_audio'):
@@ -1061,6 +1030,7 @@ class VideoGenerator:
             
             # Write final video with optimized settings
             print(f"💾 Saving video to: {output_path}")
+            print(f"📐 Video resolution: {self.width}x{self.height} @ {self.fps}fps")
             
             # Build write_videofile parameters (compatible with moviepy 1.x and 2.x)
             write_params = {
@@ -1070,7 +1040,10 @@ class VideoGenerator:
                 'temp_audiofile': 'temp-audio.m4a',
                 'remove_temp': True,
                 'preset': 'medium',  # Balance between speed and file size
-                'ffmpeg_params': ['-crf', '23']  # Good quality with reasonable file size
+                'ffmpeg_params': [
+                    '-crf', '23',  # Good quality with reasonable file size
+                    '-pix_fmt', 'yuv420p'  # Ensure consistent pixel format for compatibility
+                ]
             }
             
             # Add verbose and logger only for moviepy 1.x

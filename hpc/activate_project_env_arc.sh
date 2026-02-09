@@ -136,6 +136,16 @@ else
     echo "   Try: module load FFmpeg"
 fi
 
+# Check for TrueType fonts
+FONTS_DIR="$HOME/.fonts"
+if [ -f "$FONTS_DIR/DejaVuSerif.ttf" ] && [ -f "$FONTS_DIR/DejaVuSans.ttf" ]; then
+    echo "   ✅ TrueType fonts: $(ls "$FONTS_DIR"/DejaVu*.ttf 2>/dev/null | wc -l) fonts available"
+else
+    echo "   ⚠️  TrueType fonts not found!"
+    echo "   Video text rendering will use tiny default fonts."
+    echo "   Fix: Run ~/podcast/hpc/install_fonts.sh or re-run setup"
+fi
+
 # ============================================
 # Final Status
 # ============================================

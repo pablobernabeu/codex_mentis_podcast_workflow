@@ -18,29 +18,26 @@ class WaveformVisualizer:
         self.height = height
         self.fps = 30
         
-        # Bright orange/golden brainwave color palette (RGB values)
         self.colors = {
             'background': (20, 25, 35),      # Dark blue-gray background
-            'waveform_light': (255, 220, 100),  # Bright orange-white
-            'waveform_mid': (255, 200, 80),    # Golden orange
-            'waveform_dark': (255, 180, 60),    # Deep orange
-            'text': (240, 235, 220),            # Light beige for text
-            'accent': (255, 200, 70)           # Intense orange accent
+            'waveform_light': (255, 245, 115),
+            'waveform_mid': (255, 235, 100),
+            'waveform_dark': (255, 220, 90),
+            'text': (240, 235, 220),
+            'accent': (255, 235, 100)
         }
         
-        # Waveform parameters - configured for dramatic brainwave appearance like reference image
-        self.waveform_center_y = height // 2  # Center line aligned with logo center
-        self.waveform_amplitude = 650  # High amplitude for spikes
-        self.waveform_area_height = 900  # Tall area to allow full spike range
-        self.waveform_line_thickness = 1  # Ultra-thin line for sharp, precise brainwave look
+        self.waveform_center_y = height // 2
+        self.waveform_amplitude = 900
+        self.waveform_area_height = 900
+        self.waveform_line_thickness = 1
         
-        # Scrolling waveform parameters
-        self.samples_per_pixel = 100  # How many audio samples per pixel
-        self.history_width = width  # Full width - no margins
-        self.scroll_speed = 2  # Pixels per frame to scroll left
+        self.samples_per_pixel = 100
+        self.history_width = width
+        self.scroll_speed = 2
         
     def analyze_audio_frame(self, audio, sr, start_time, window_duration=3.0):
-        """Analyze audio for waveform - get actual amplitude data."""
+        """Analyze audio for waveform."""
         start_sample = int(start_time * sr)
         window_samples = int(window_duration * sr)
         end_sample = min(start_sample + window_samples, len(audio))
@@ -48,36 +45,23 @@ class WaveformVisualizer:
         if start_sample >= len(audio):
             return np.zeros(self.history_width)
         
-        # Extract audio window for scrolling display
         window_audio = audio[start_sample:end_sample]
-        
-        # Downsample to match pixel width for smooth scrolling
         if len(window_audio) == 0:
             return np.zeros(self.history_width)
         
-        # Calculate samples per pixel for this window
         samples_per_pixel = max(1, len(window_audio) // self.history_width)
-        
-        # Downsample by taking RMS values in chunks for smooth representation
         downsampled = []
         for i in range(0, len(window_audio), samples_per_pixel):
             chunk = window_audio[i:i + samples_per_pixel]
             if len(chunk) > 0:
-                # Use RMS for better volume representation
                 rms_value = np.sqrt(np.mean(chunk**2))
-                # Keep some of the original waveform character
                 avg_value = np.mean(chunk)
-                # Combine for spiky brainwave pattern
-                combined = avg_value * (0.3 + 3.5 * rms_value)  # High multiplier for spikes
-                # Add high-frequency variation for spiky appearance
-                spike_variation = np.random.normal(0, 0.25) * rms_value  # Variation for spikes
+                combined = avg_value * (0.3 + 5.5 * rms_value)
+                spike_variation = np.random.normal(0, 0.35) * rms_value
                 combined += spike_variation
-                # Add occasional spikes for brainwave-like appearance
-                if np.random.random() < 0.15:  # 15% chance of spike
-                    combined *= np.random.uniform(1.5, 2.5)  # 50-150% boost
+                if np.random.random() < 0.25:
+                    combined *= np.random.uniform(1.8, 3.2)
                 downsampled.append(combined)
-        
-        # Pad or trim to exact width
         if len(downsampled) < self.history_width:
             downsampled.extend([0] * (self.history_width - len(downsampled)))
         else:
@@ -87,85 +71,52 @@ class WaveformVisualizer:
     
     def create_waveform_frame(self, waveform_data, time_position, total_duration):
         """Create a single frame of the waveform visualization."""
-        # Create transparent background so logo can show through
-        frame = np.zeros((self.height, self.width, 4), dtype=np.uint8)  # RGBA with transparent background
+        frame = np.zeros((self.height, self.width, 4), dtype=np.uint8)
         
-        # Draw continuous center line (baseline) across entire width
-        center_line_color = [*[int(c * 0.3) for c in self.colors['waveform_dark']], 128]  # Semi-transparent
+        center_line_color = [*[int(c * 0.3) for c in self.colors['waveform_dark']], 128]
         cv2.line(frame, (0, self.waveform_center_y), (self.width, self.waveform_center_y), 
                 center_line_color, 1)
         
-        # Convert waveform data to pixel coordinates
         if len(waveform_data) > 1:
-            # Draw continuous waveform across entire width - logo will be overlaid on top
             points = []
             for i, amplitude in enumerate(waveform_data):
                 x = i
-                if x >= self.width:  # Don't go beyond screen width
+                if x >= self.width:
                     break
                 
-                # Scale amplitude to pixel coordinates
                 y_offset = amplitude * self.waveform_amplitude
                 y = self.waveform_center_y - int(y_offset)
                 y = max(50, min(self.height - 50, y))
                 
                 points.append((x, y))
-            
-            # Draw continuous waveform
             if len(points) > 1:
                 self.draw_smooth_waveform(frame, points, waveform_data[:len(points)])
         
         return frame
-    
-    def draw_smooth_waveform(self, frame, points, amplitude_data):
-        """Draw a smooth, gradient waveform line."""
-        if len(points) < 2:
+
             return
         
-        # Create ultra-thin, bright, spiky brainwave
-        for pass_idx in range(8):  # Multiple passes for glow and brightness
-            # Ultra-thin lines with subtle thickness variation
-            if pass_idx < 2:
-                thickness = max(1, self.waveform_line_thickness + 3)  # Outer glow slightly thicker
+        for pass_idx in range(4):
+            if pass_idx < 1:
+                thickness = max(1, self.waveform_line_thickness + 2)
             else:
-                thickness = 1  # Core is ultra-thin
-            
-            # Bright orange/golden colors
-            if pass_idx == 0:  # Outermost glow - pure bright white-orange
-                color = [255, 220, 100]
-            elif pass_idx == 1:  # Second glow - bright orange
-                color = [255, 210, 90]
-            elif pass_idx == 2:  # Third layer - bright lemon orange
-                color = [255, 200, 80]
-            elif pass_idx == 3:  # Fourth layer - golden orange
-                color = [255, 190, 75]
-            elif pass_idx == 4:  # Fifth layer - pure golden
-                color = [255, 185, 70]
-            elif pass_idx == 5:  # Sixth layer - deep golden
-                color = [255, 180, 65]
-            elif pass_idx == 6:  # Inner core - intense golden
-                color = [255, 175, 60]
-            else:  # Ultimate core - brightest golden accent
-                color = [255, 200, 70]
+                thickness = 1
+            if pass_idx == 0:  # Outermost glow
+                color = [255, 230, 100]  # Medium yellow (minimal glow)
+            elif pass_idx == 1:  # Inner glow
+                color = [255, 235, 105]  # Bright yellow
+            elif pass_idx == 2:  # Near core
+                color = [255, 240, 110]  # Brighter yellow
+            else:  # Core (pass_idx == 3)
+                color = [255, 245, 115]  # Brightest yellow (matches frame)
             
             # Draw line segments with full opacity
             for i in range(len(points) - 1):
-                # Enhance brightness on all amplitudes for constant glow
-                amp_intensity = min(1.0, abs(amplitude_data[i] if i < len(amplitude_data) else 0) * 30)  # Multiplier
-                brightness_boost = 0.85 + 0.15 * amp_intensity  # Bright base
-                adjusted_color = [int(c * brightness_boost) for c in color] + [255]  # Full opacity
+                amp_intensity = min(1.0, abs(amplitude_data[i] if i < len(amplitude_data) else 0) * 30)
+                brightness_boost = 0.85 + 0.15 * amp_intensity
+                adjusted_color = [int(c * brightness_boost) for c in color] + [255]
                 
                 cv2.line(frame, points[i], points[i + 1], adjusted_color, thickness)
-        
-        # Bubble effects disabled per user request
-        # for i, (point, amp) in enumerate(zip(points, amplitude_data)):
-        #     if abs(amp) > 0.03:  # Lower threshold for more glow points
-        #         glow_intensity = min(255, int(255 * abs(amp) * 2.0))
-        #         # Bright yellow-white glow
-        #         glow_color = [255, 255, min(255, 180 + glow_intensity // 2)] + [255]  # Full opacity
-        #         # Larger glow circles for spikes
-        #         glow_size = 10 if abs(amp) > 0.1 else 6
-        #         cv2.circle(frame, point, glow_size, glow_color, -1)
     
     def add_progress_bar(self, frame, time_position, total_duration):
         """Add a subtle progress bar at the bottom."""

@@ -230,13 +230,20 @@ get_episode_title() {
 
 # Function to save episode titles
 save_episode_titles() {
+    # Build Python dictionary entries in bash
+    local dict_entries=""
+    for key in "${!EPISODE_TITLES[@]}"; do
+        # Escape single quotes in values
+        local escaped_value="${EPISODE_TITLES[$key]//\'/\\\'}"
+        dict_entries+="    '$key': '$escaped_value',
+"
+    done
+    
+    # Execute Python with complete script
     python3 -c "
 import json
-titles = {"
-    for key in "${!EPISODE_TITLES[@]}"; do
-        echo "    '$key': '${EPISODE_TITLES[$key]}',"
-    done
-    echo "}
+titles = {
+${dict_entries}}
 with open('$EPISODE_TITLES_FILE', 'w') as f:
     json.dump(titles, f, indent=2, ensure_ascii=False)
 print('   ✅ Episode titles saved')

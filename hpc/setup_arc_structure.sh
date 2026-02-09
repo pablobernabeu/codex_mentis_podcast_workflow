@@ -214,6 +214,48 @@ else
 fi
 echo ""
 
+# Install fonts for video generation
+echo "5. Installing TrueType fonts for video text rendering..."
+FONTS_DIR="$HOME/.fonts"
+mkdir -p "$FONTS_DIR"
+
+# Check if DejaVu fonts already installed
+if [ -f "$FONTS_DIR/DejaVuSerif.ttf" ]; then
+    echo "   ✅ Fonts already installed"
+else
+    echo "   📥 Downloading DejaVu fonts..."
+    cd /tmp
+    FONT_URL="https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.tar.bz2"
+    
+    # Try wget first, fall back to curl
+    if command -v wget &> /dev/null; then
+        wget -q "$FONT_URL" || { echo "   ❌ Download failed"; exit 1; }
+    elif command -v curl &> /dev/null; then
+        curl -L -O "$FONT_URL" || { echo "   ❌ Download failed"; exit 1; }
+    else
+        echo "   ❌ Neither wget nor curl available. Please install fonts manually."
+        exit 1
+    fi
+    
+    echo "   📦 Extracting fonts..."
+    tar -xjf dejavu-fonts-ttf-2.37.tar.bz2
+    
+    echo "   📋 Installing fonts..."
+    cp dejavu-fonts-ttf-2.37/ttf/*.ttf "$FONTS_DIR/"
+    
+    echo "   🧹 Cleaning up..."
+    rm -rf dejavu-fonts-ttf-2.37*
+    
+    # Update font cache if fc-cache is available
+    if command -v fc-cache &> /dev/null; then
+        echo "   🔄 Updating font cache..."
+        fc-cache -f -v "$FONTS_DIR" > /dev/null 2>&1
+    fi
+    
+    echo "   ✅ Fonts installed: $(ls "$FONTS_DIR"/DejaVu*.ttf | wc -l) DejaVu fonts"
+fi
+echo ""
+
 # Summary
 echo "==================================="
 echo "Setup Complete!"
@@ -239,6 +281,9 @@ echo "Next steps:"
 echo "1. Copy HPC scripts to: $PERSONAL_DIR/hpc/"
 echo "2. Copy src/ files to: $PERSONAL_DIR/src/"
 echo "3. Upload podcast logo to: $PROJECT_DIR/assets/"
-echo "4. Run: source $PERSONAL_DIR/activate_project_env_arc.sh"
-echo "5. Install packages: pip install -r requirements.txt"
+echo "4. Upload episode images (optional) to: $PROJECT_DIR/input/"
+echo "5. Run: source $PERSONAL_DIR/activate_project_env_arc.sh"
+echo "6. Install packages: pip install -r requirements.txt"
+echo ""
+echo "✅ TrueType fonts installed - video text will render at proper size"
 echo ""

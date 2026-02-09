@@ -4,8 +4,6 @@ import soundfile as sf
 from scipy import signal
 import os
 
-# Note: Noise reduction disabled for AI-generated speech (no noise present)
-
 
 class AudioProcessor:
     """Handles audio enhancement and processing for podcast files."""

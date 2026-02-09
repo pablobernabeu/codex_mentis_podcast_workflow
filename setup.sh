@@ -60,6 +60,37 @@ else
     echo "• Format: JPG or PNG"
 fi
 
+# Check for TrueType fonts (important for video text rendering)
+echo ""
+echo "🔤 Checking for TrueType fonts..."
+FONTS_FOUND=false
+
+# Check common font locations
+if [ -f "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf" ] || \
+   [ -f "/usr/share/fonts/dejavu/DejaVuSerif.ttf" ] || \
+   [ -f "$HOME/.fonts/DejaVuSerif.ttf" ] || \
+   [ -f "/System/Library/Fonts/Supplemental/Times New Roman.ttf" ] || \
+   [ -f "/Library/Fonts/Arial.ttf" ]; then
+    FONTS_FOUND=true
+fi
+
+# On Windows with Git Bash, fonts are always available
+if [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]]; then
+    FONTS_FOUND=true
+fi
+
+if [ "$FONTS_FOUND" = true ]; then
+    echo "✅ TrueType fonts available"
+else
+    echo "⚠️  TrueType fonts not found!"
+    echo "Video text rendering may use tiny default fonts."
+    echo ""
+    echo "To fix on Linux:"
+    echo "  sudo apt install fonts-dejavu  # Debian/Ubuntu"
+    echo "  sudo yum install dejavu-fonts  # RHEL/CentOS"
+    echo "  Or install to user directory: mkdir -p ~/.fonts && download fonts there"
+fi
+
 echo ""
 echo "🎯 Setup complete! Usage instructions:"
 echo "1. Place your WAV files in the input/ directory"

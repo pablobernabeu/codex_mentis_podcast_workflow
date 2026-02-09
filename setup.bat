@@ -82,6 +82,15 @@ if exist "assets\podcast_logo.jpg" (
     echo • Format: JPG or PNG
 )
 
+REM Check for TrueType fonts (Windows always has these)
+echo.
+echo 🔤 Checking for TrueType fonts...
+if exist "C:\Windows\Fonts\times.ttf" (
+    echo ✅ TrueType fonts available (Windows system fonts)
+) else (
+    echo ⚠️  System fonts directory unusual - check Windows installation
+)
+
 echo.
 echo 🎯 Setup complete! Usage instructions:
 echo 1. Place your WAV files in the input\ directory
