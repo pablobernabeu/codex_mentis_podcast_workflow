@@ -36,8 +36,8 @@ class VideoGenerator:
             'waveform_dark': (180, 140, 100),
             'text': (240, 235, 220),
             'accent': (255, 200, 120),
-            'text_bg': (0, 0, 0, 120),
-            'podcast': (180, 190, 200)
+            'text_bg': (0, 0, 0, 120),  # Semi-transparent background
+            'podcast': (180, 190, 200)  # Cool silver-grey for podcast name
         }
     
     def get_view_state(self, time_position, duration):
@@ -48,6 +48,10 @@ class VideoGenerator:
             - state: 'composite', 'fullscreen', 'zoom_in', or 'zoom_out'
             - transition_progress: 0.0-1.0 for transitions, None otherwise
         """
+        # Pattern: 1min composite -> 5min fullscreen -> 30s composite -> 5min fullscreen -> ...
+        # With zoom transitions between states
+        # Always show composite during the last minute
+        
         # Pattern: 1min composite -> 5min fullscreen -> 30s composite -> 5min fullscreen -> ...
         # With zoom transitions between states
         # Always show composite during the last minute
@@ -92,6 +96,7 @@ class VideoGenerator:
         else:
             # Zoom-in transition
             progress = (time_in_cycle - (self.fullscreen_image_duration + self.composite_interval_duration - self.zoom_transition_duration)) / self.zoom_transition_duration
+            # Don't zoom in if we're about to enter final composite period
             if time_remaining <= final_composite_duration + self.zoom_transition_duration:
                 return ('composite', None)
             return ('zoom_in', progress)
@@ -199,6 +204,7 @@ class VideoGenerator:
             layer_thickness = frame_width / num_layers
             
             for i, color in enumerate(orange_colors):
+                # Calculate inset for this gradient layer
                 inset = int(i * layer_thickness)
                 frame_draw.rectangle(
                     [inset, inset, frame_size[0] - inset - 1, frame_size[1] - inset - 1],
@@ -254,12 +260,14 @@ class VideoGenerator:
         light_overlay = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(light_overlay)
         
+        # Complete one full cycle every 24 seconds
         cycle_duration = 24.0
         progress = (time_position % cycle_duration) / cycle_duration
         
-        glow_offset = 20
-        frame_width = 12
-        frame_center_offset = glow_offset + frame_width // 2
+        # Frame dimensions
+        glow_offset = 20  # Outer glow size
+        frame_width = 12  # Frame thickness
+        frame_center_offset = glow_offset + frame_width // 2  # Center of frame border
         
         # Get the total framed image dimensions
         img_width = image.width
@@ -274,15 +282,19 @@ class VideoGenerator:
         current_pos = (progress * perimeter + starting_offset) % perimeter
         
         if current_pos < frame_rect_width:
+            # Top edge
             light_x = episode_x + frame_center_offset + current_pos
             light_y = episode_y + frame_center_offset
         elif current_pos < frame_rect_width + frame_rect_height:
+            # Right edge
             light_x = episode_x + img_width - frame_center_offset
             light_y = episode_y + frame_center_offset + (current_pos - frame_rect_width)
         elif current_pos < 2 * frame_rect_width + frame_rect_height:
+            # Bottom edge
             light_x = episode_x + img_width - frame_center_offset - (current_pos - frame_rect_width - frame_rect_height)
             light_y = episode_y + img_height - frame_center_offset
         else:
+            # Left edge
             light_x = episode_x + frame_center_offset
             light_y = episode_y + img_height - frame_center_offset - (current_pos - 2 * frame_rect_width - frame_rect_height)
         
@@ -302,7 +314,7 @@ class VideoGenerator:
         )
         draw.ellipse(
             [light_x - 5, light_y - 5, light_x + 5, light_y + 5],
-            fill=light_color + (100,)
+            fill=light_color + (100,)  # Bright center
         )
         draw.ellipse(
             [light_x - 2, light_y - 2, light_x + 2, light_y + 2],
@@ -506,6 +518,7 @@ class VideoGenerator:
             best_podcast_font_size = min_podcast_font_size
             podcast_font = None
             
+            # Binary search for optimal font size
             while max_podcast_font_size - min_podcast_font_size > 2:
                 podcast_font_size = (min_podcast_font_size + max_podcast_font_size) // 2
                 
@@ -527,6 +540,7 @@ class VideoGenerator:
                         continue
                 
                 if test_font is None:
+                    # Fall back to default font
                     test_font = ImageFont.load_default()
                 
                 podcast_bbox = temp_draw.textbbox((0, 0), self.podcast_name, font=test_font)
@@ -602,7 +616,7 @@ class VideoGenerator:
             # Vertically centered in available bottom space if we have an image, otherwise use margin
             if episode_image is not None:
                 image_bottom_y = (self.height + episode_image.height) // 2
-                visual_image_bottom = image_bottom_y - 32
+                visual_image_bottom = image_bottom_y - 32  # Account for glow and frame
                 midpoint = (visual_image_bottom + self.height) // 2
                 podcast_y = midpoint - podcast_height // 2
             else:
@@ -611,12 +625,15 @@ class VideoGenerator:
         text_img = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(text_img)
         
+        # Verify dimensions on first call
         if not hasattr(self, '_logged_text_size'):
             print(f"  📐 Text overlay size: {text_img.size} (should be {self.width}x{self.height})")
             self._logged_text_size = True
         
+        # Static glow effect for episode title
         glow_alpha = 100
         
+        # Draw multiple shadow layers for glow
         for offset in [5, 4, 3]:
             glow_layer_alpha = int(glow_alpha * (offset / 5.0) * 0.4)
             draw.text(
@@ -626,10 +643,11 @@ class VideoGenerator:
                 fill=(0, 0, 0, min(255, max(0, glow_layer_alpha)))
             )
         
+        # Draw title in bright yellow
         golden_yellow = (255, 235, 100)
         draw.text((episode_x, episode_y), clean_title, font=episode_font, fill=golden_yellow)
         
-
+        # Draw glow for podcast name
         for offset in [5, 4, 3]:
             glow_layer_alpha = int(glow_alpha * (offset / 5.0) * 0.4)
             draw.text(

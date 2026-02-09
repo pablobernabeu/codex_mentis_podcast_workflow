@@ -6,6 +6,7 @@ import os
 
 
 class AudioProcessor:
+    """Handles audio processing including normalization and format conversion."""
     """Handles audio enhancement and processing for podcast files."""
     
     def __init__(self):

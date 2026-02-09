@@ -37,7 +37,7 @@ class WaveformVisualizer:
         self.scroll_speed = 2
         
     def analyze_audio_frame(self, audio, sr, start_time, window_duration=3.0):
-        """Analyze audio for waveform."""
+        """Analyze audio segment and extract waveform amplitudes."""
         start_sample = int(start_time * sr)
         window_samples = int(window_duration * sr)
         end_sample = min(start_sample + window_samples, len(audio))
@@ -54,14 +54,19 @@ class WaveformVisualizer:
         for i in range(0, len(window_audio), samples_per_pixel):
             chunk = window_audio[i:i + samples_per_pixel]
             if len(chunk) > 0:
+                # Use RMS for volume representation
                 rms_value = np.sqrt(np.mean(chunk**2))
                 avg_value = np.mean(chunk)
+                # Create spiky brainwave pattern
                 combined = avg_value * (0.3 + 5.5 * rms_value)
                 spike_variation = np.random.normal(0, 0.35) * rms_value
                 combined += spike_variation
+                # Add frequent sharp spikes
                 if np.random.random() < 0.25:
                     combined *= np.random.uniform(1.8, 3.2)
                 downsampled.append(combined)
+        
+        # Pad or trim to exact width
         if len(downsampled) < self.history_width:
             downsampled.extend([0] * (self.history_width - len(downsampled)))
         else:
@@ -71,12 +76,15 @@ class WaveformVisualizer:
     
     def create_waveform_frame(self, waveform_data, time_position, total_duration):
         """Create a single frame of the waveform visualization."""
+        # Create transparent RGBA frame
         frame = np.zeros((self.height, self.width, 4), dtype=np.uint8)
         
+        # Draw center baseline
         center_line_color = [*[int(c * 0.3) for c in self.colors['waveform_dark']], 128]
         cv2.line(frame, (0, self.waveform_center_y), (self.width, self.waveform_center_y), 
                 center_line_color, 1)
         
+        # Convert waveform amplitudes to pixel coordinates
         if len(waveform_data) > 1:
             points = []
             for i, amplitude in enumerate(waveform_data):
@@ -84,11 +92,14 @@ class WaveformVisualizer:
                 if x >= self.width:
                     break
                 
+                # Scale amplitude to pixels
                 y_offset = amplitude * self.waveform_amplitude
                 y = self.waveform_center_y - int(y_offset)
-                y = max(50, min(self.height - 50, y))
+                y = max(50, min(self.height - 50, y))  # Clamp to screen bounds
                 
                 points.append((x, y))
+            
+            # Draw waveform line
             if len(points) > 1:
                 self.draw_smooth_waveform(frame, points, waveform_data[:len(points)])
         
@@ -97,6 +108,7 @@ class WaveformVisualizer:
             return
         
         for pass_idx in range(4):
+            # Ultra-thin core with minimal glow
             if pass_idx < 1:
                 thickness = max(1, self.waveform_line_thickness + 2)
             else:
