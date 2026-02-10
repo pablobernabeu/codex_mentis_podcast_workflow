@@ -162,18 +162,18 @@ EPISODE_TITLES_FILE="$HOME/podcast/episode_titles.json"
 # Ensure target directories exist
 mkdir -p "$AUDIO_INPUT_DIR" "$ASSETS_DIR"
 
-# Sync input audio files
+# Sync input audio files (always update newer files)
 if [ -d "$HOME_INPUT" ] && [ "$(ls -A "$HOME_INPUT" 2>/dev/null)" ]; then
     echo "   🔄 Syncing audio files from $HOME_INPUT..."
-    rsync -av --ignore-existing "$HOME_INPUT/" "$AUDIO_INPUT_DIR/" 2>/dev/null
+    rsync -av --update "$HOME_INPUT/" "$AUDIO_INPUT_DIR/" 2>/dev/null
     echo "   ✅ Audio files synced"
 fi
 
-# Sync assets (logo, images)
+# Sync assets (logo, images) - always update to ensure latest versions
 if [ -d "$HOME_ASSETS" ] && [ "$(ls -A "$HOME_ASSETS" 2>/dev/null)" ]; then
     echo "   🔄 Syncing assets from $HOME_ASSETS..."
-    rsync -av --ignore-existing "$HOME_ASSETS/" "$ASSETS_DIR/" 2>/dev/null
-    echo "   ✅ Assets synced"
+    rsync -av "$HOME_ASSETS/" "$ASSETS_DIR/" 2>/dev/null
+    echo "   ✅ Assets synced (including updated logo)"
 fi
 echo ""
 

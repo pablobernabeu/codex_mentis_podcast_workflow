@@ -104,9 +104,9 @@ class WaveformVisualizer:
                 self.draw_smooth_waveform(frame, points, waveform_data[:len(points)])
         
         return frame
-
-            return
-        
+    
+    def draw_smooth_waveform(self, frame, points, amplitude_data):
+        """Draw smooth waveform with minimal glow effect."""
         for pass_idx in range(4):
             # Ultra-thin core with minimal glow
             if pass_idx < 1:

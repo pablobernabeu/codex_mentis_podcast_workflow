@@ -124,22 +124,22 @@ echo ""
 # ============================================
 echo "📂 STEP 2.5: Syncing files from home to data directory..."
 
-# Sync input audio files
+# Sync input audio files (update if newer)
 HOME_INPUT="$HOME/podcast/input"
 if [ -d "$HOME_INPUT" ] && [ "$(ls -A "$HOME_INPUT" 2>/dev/null)" ]; then
     echo "   🔄 Syncing audio files from $HOME_INPUT..."
-    rsync -av --ignore-existing "$HOME_INPUT/" "$AUDIO_INPUT_DIR/"
+    rsync -av --update "$HOME_INPUT/" "$AUDIO_INPUT_DIR/"
     echo "   ✅ Audio files synced"
 else
     echo "   ℹ️  No audio files in home input directory"
 fi
 
-# Sync assets (logo, images)
+# Sync assets (logo, images) - always sync to ensure latest versions
 HOME_ASSETS="$HOME/podcast/assets"
 if [ -d "$HOME_ASSETS" ] && [ "$(ls -A "$HOME_ASSETS" 2>/dev/null)" ]; then
     echo "   🔄 Syncing assets from $HOME_ASSETS..."
-    rsync -av --ignore-existing "$HOME_ASSETS/" "$ASSETS_DIR/"
-    echo "   ✅ Assets synced"
+    rsync -av "$HOME_ASSETS/" "$ASSETS_DIR/"
+    echo "   ✅ Assets synced (including updated logo)"
 else
     echo "   ℹ️  No assets in home assets directory"
 fi
@@ -291,22 +291,17 @@ if [ -f "$CONDA_ENV_PATH/episode_titles.json" ]; then
     cp "$CONDA_ENV_PATH/episode_titles.json" "$HOME/podcast/episode_titles.json"
 fi
 
-# Build command with batch mode
-CONVERSION_CMD="python main.py --batch"
+# Build command - in array job mode, always process single file assigned to this task
+CONVERSION_CMD="python main.py --batch --file \"$AUDIO_FILE\""
 if [ "$ENHANCE_AUDIO" = true ]; then
     CONVERSION_CMD="$CONVERSION_CMD --enhance-audio"
 fi
 
-# Add specific file if in single-file mode
-if [ -n "$SINGLE_FILE" ]; then
-    CONVERSION_CMD="$CONVERSION_CMD --file \"$AUDIO_FILE\""
-fi
-
-# Run the conversion with timeout (6 hours max)
+# Run the conversion with timeout (7h 45m max, allowing buffer before SLURM 8h limit)
 echo "Running: $CONVERSION_CMD"
 echo "---"
 
-eval timeout 21600 $CONVERSION_CMD
+eval timeout 27900 $CONVERSION_CMD
 
 CONVERSION_EXIT_CODE=$?
 
@@ -353,7 +348,7 @@ if [ "$TRANSCRIPTION" = true ]; then
         echo "   Options:$TRANSCRIPTION_ARGS"
         echo "   ---"
         
-        timeout 21600 python "$TRANSCRIPTION_SCRIPT" "$AUDIO_FILE" $TRANSCRIPTION_ARGS
+        timeout 27900 python "$TRANSCRIPTION_SCRIPT" "$AUDIO_FILE" $TRANSCRIPTION_ARGS
         TRANSCRIPTION_EXIT_CODE=$?
         
         echo "   ---"
@@ -401,7 +396,7 @@ if [ $CONVERSION_EXIT_CODE -eq 0 ]; then
     fi
     
 elif [ $CONVERSION_EXIT_CODE -eq 124 ]; then
-    echo "❌ TIMEOUT: Conversion exceeded 6 hour limit"
+    echo "❌ TIMEOUT: Conversion exceeded time limit (7h 45m)"
 else
     echo "❌ FAILURE: Conversion failed with exit code $CONVERSION_EXIT_CODE"
 fi

@@ -29,7 +29,7 @@ def main():
     if not logo_path.exists():
         print(f"❌ Logo not found: {logo_path}")
         print("   Looking for any logo file...")
-        logo_files = list(Path("assets").glob("podcast_logo.*"))
+        logo_files = [f for f in Path("assets").glob("podcast_logo.*") if f.stem == "podcast_logo"]
         if logo_files:
             logo_path = logo_files[0]
             print(f"   ✓ Found: {logo_path}")

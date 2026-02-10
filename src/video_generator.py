@@ -411,8 +411,8 @@ class VideoGenerator:
                 available_top_space = int(self.height * 0.4)
                 available_bottom_space = int(self.height * 0.4)
             
-            # Horizontal margins
-            margin_x = int(self.width * 0.005)  # 0.5% side margins
+            # Horizontal margins - minimal for maximum text space
+            margin_x = int(self.width * 0.01)  # 1% side margins (19px at 1920px)
             usable_width = self.width - 2 * margin_x
             
             # Remove 'Episode: ' prefix if present
@@ -470,8 +470,8 @@ class VideoGenerator:
                 episode_width = episode_bbox[2] - episode_bbox[0]
                 episode_height = episode_bbox[3] - episode_bbox[1]
                 
-                # Check if it fits within screen bounds
-                if episode_width <= self.width * 0.95 and episode_height <= available_top_space * 0.9:
+                # Check if it fits within usable width (respecting margins)
+                if episode_width <= usable_width and episode_height <= available_top_space * 0.9:
                     # Fits! Try larger
                     best_title_font_size = title_font_size
                     episode_font = test_font
@@ -547,7 +547,7 @@ class VideoGenerator:
                 podcast_width = podcast_bbox[2] - podcast_bbox[0]
                 podcast_height = podcast_bbox[3] - podcast_bbox[1]
                 
-                if podcast_width <= self.width * 0.95 and podcast_height <= available_bottom_space * 0.9:
+                if podcast_width <= usable_width and podcast_height <= available_bottom_space * 0.9:
                     best_podcast_font_size = podcast_font_size
                     podcast_font = test_font
                     min_podcast_font_size = podcast_font_size
@@ -586,12 +586,11 @@ class VideoGenerator:
             print(f"  📏 Podcast name font size: {podcast_font_size}px (available space: {available_bottom_space}px)")
             
             # Calculate positions for text
-            # Horizontal margins
             episode_bbox = temp_draw.textbbox((0, 0), clean_title, font=episode_font)
             episode_width = episode_bbox[2] - episode_bbox[0]
             episode_height = episode_bbox[3] - episode_bbox[1]
             
-            # Centered horizontally
+            # Center within usable area (equal margins on both sides)
             episode_x = margin_x + (usable_width - episode_width) // 2
             
             # Vertically centered in available top space if we have an image, otherwise use margin
@@ -610,7 +609,7 @@ class VideoGenerator:
             podcast_width = podcast_bbox[2] - podcast_bbox[0]
             podcast_height = podcast_bbox[3] - podcast_bbox[1]
             
-            # Centered horizontally
+            # Center within usable area (equal margins on both sides)
             podcast_x = margin_x + (usable_width - podcast_width) // 2
             
             # Vertically centered in available bottom space if we have an image, otherwise use margin

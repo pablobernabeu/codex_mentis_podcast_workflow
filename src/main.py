@@ -186,8 +186,8 @@ class PodcastVideoConverter:
     
     def check_logo_file(self):
         """Check if logo file exists and validate there's only one logo file."""
-        # Find all files in assets that start with 'podcast_logo'
-        logo_files = list(self.assets_dir.glob("podcast_logo.*"))
+        # Find files named exactly 'podcast_logo' with any extension (exclude variants like 'podcast_logo_with_signal')
+        logo_files = [f for f in self.assets_dir.glob("podcast_logo.*") if f.stem == "podcast_logo"]
         
         if len(logo_files) == 0:
             print("❌ Logo file not found!")

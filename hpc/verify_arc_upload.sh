@@ -88,12 +88,23 @@ if [ -d "$PROJECT_DIR" ]; then
         fi
     done
     
-    # Check for podcast logo
+    # Check for podcast logo (exact name 'podcast_logo', excluding variants)
     echo ""
     echo "   Required Assets:"
-    LOGO_FILES=$(find "$PROJECT_DIR/assets" -name "podcast_logo.*" -type f 2>/dev/null | wc -l)
+    LOGO_FILES=0
+    LOGO=""
+    for file in "$PROJECT_DIR/assets"/podcast_logo.*; do
+        if [ -f "$file" ]; then
+            filename=$(basename "$file")
+            # Extract name without extension
+            name="${filename%.*}"
+            if [ "$name" = "podcast_logo" ]; then
+                LOGO_FILES=$((LOGO_FILES + 1))
+                LOGO="$file"
+            fi
+        fi
+    done
     if [ "$LOGO_FILES" -gt 0 ]; then
-        LOGO=$(find "$PROJECT_DIR/assets" -name "podcast_logo.*" -type f 2>/dev/null | head -1)
         echo "      ✅ Podcast logo: $(basename "$LOGO")"
     else
         echo "      ❌ Podcast logo not found!"
