@@ -58,11 +58,17 @@ class VideoGenerator:
         
         final_composite_duration = 60.0  # Last 1 minute always composite
         
-        # Check if we're in the final composite period
+        # Check if we're in the final composite period or its zoom-out transition
         time_remaining = duration - time_position
-        if time_remaining <= final_composite_duration:
-            # Last minute - always show composite
-            return ('composite', None)
+        if time_remaining <= final_composite_duration + self.zoom_transition_duration:
+            # Check if we need a zoom-out transition to final composite
+            if time_remaining > final_composite_duration:
+                # We're in the zoom-out transition to final composite
+                progress = 1.0 - ((time_remaining - final_composite_duration) / self.zoom_transition_duration)
+                return ('zoom_out', progress)
+            else:
+                # Final minute - show composite
+                return ('composite', None)
         
         cycle_duration = self.fullscreen_image_duration + self.composite_interval_duration
         
@@ -96,8 +102,10 @@ class VideoGenerator:
         else:
             # Zoom-in transition
             progress = (time_in_cycle - (self.fullscreen_image_duration + self.composite_interval_duration - self.zoom_transition_duration)) / self.zoom_transition_duration
-            # Don't zoom in if we're about to enter final composite period
-            if time_remaining <= final_composite_duration + self.zoom_transition_duration:
+            # Don't zoom in if we're approaching the final composite period
+            # Need time for: this zoom-in + minimum fullscreen + zoom-out + final composite
+            min_time_needed = final_composite_duration + 2 * self.zoom_transition_duration + 10.0  # 10s minimum fullscreen
+            if time_remaining <= min_time_needed:
                 return ('composite', None)
             return ('zoom_in', progress)
     
